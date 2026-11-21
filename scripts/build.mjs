@@ -12,7 +12,7 @@ assets['/assets/login-ctrl-hero.png']={body:readFileSync(resolve(root,'web/asset
 assets['/login.css']={body:readFileSync(resolve(root,'web/login.css'),'utf8'),type:'text/css; charset=utf-8'};
 assets['/auth-validation.js']={body:readFileSync(resolve(root,'lib/auth-validation.mjs'),'utf8'),type:'text/javascript; charset=utf-8'};
 assets['/ctrl.css']={body:readFileSync(resolve(root,'web/ctrl.css'),'utf8'),type:'text/css; charset=utf-8'};
-for(const file of ['reference-utilities.css','ctrl-reference.css','ctrl-overlays.css','analytics-ui.js','reference-view.js','itsm-demo.js'])assets['/'+file]={body:readFileSync(resolve(root,'web',file),'utf8'),type:file.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8'};
+for(const file of ['reference-utilities.css','ctrl-reference.css','ctrl-overlays.css','analytics-ui.js','reference-view.js','itsm-demo.js','operations-ui.js','operations.css'])assets['/'+file]={body:readFileSync(resolve(root,'web',file),'utf8'),type:file.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8'};
 for(const [path,file,type] of [['/login.js','login.js','text/javascript; charset=utf-8'],['/account','account.html','text/html; charset=utf-8'],['/account.js','account.js','text/javascript; charset=utf-8'],['/ai-settings','ai-settings.html','text/html; charset=utf-8'],['/ai-settings.js','ai-settings.js','text/javascript; charset=utf-8']])assets[path]={body:readFileSync(resolve(root,'web',file),'utf8'),type};
 assets['/mts-simulation.js']={body:readFileSync(resolve(root,'lib/mts-simulation.mjs'),'utf8'),type:'text/javascript; charset=utf-8'};
 assets['/itsm-demo']={body:readFileSync(resolve(root,'web/itsm-demo.html'),'utf8'),type:'text/html; charset=utf-8'};
@@ -45,6 +45,8 @@ for(const [MODE,fields] of Object.entries(boldConcepts)){
  assets['/concept/'+MODE]={body,type:'text/html; charset=utf-8'};
 }
 assets['/incidents.js']={body:readFileSync(resolve(root,'lib/incidents.mjs'),'utf8'),type:'text/javascript; charset=utf-8'};
+assets['/operations.js']={body:readFileSync(resolve(root,'lib/operations.mjs'),'utf8').replace("from './incidents.mjs'","from '/incidents.js'"),type:'text/javascript; charset=utf-8'};
+assets['/assistant-rules.js']={body:readFileSync(resolve(root,'lib/assistant-rules.mjs'),'utf8').replace(/from '\.\/(incidents|operations)\.mjs'/g,"from '/$1.js'"),type:'text/javascript; charset=utf-8'};
 assets['/import-summary.js']={body:readFileSync(resolve(root,'lib/import-summary.mjs'),'utf8').replace("from './incidents.mjs'","from '/incidents.js'"),type:'text/javascript; charset=utf-8'};
 let source=readFileSync(resolve(root,'worker/index.js'),'utf8');
 source=source.replace(/^import \{[^\n]+\} from '\.\.\/lib\/ai-settings\.mjs';\n/m,()=>readFileSync(resolve(root,'lib/ai-settings.mjs'),'utf8').replace(/^import \{[^\n]+\} from '\.\/yandex\.mjs';\n/m,'')+'\n');
@@ -53,10 +55,16 @@ source=source.replace(/^import \{[^\n]+\} from '\.\.\/lib\/auth\.mjs';\n/m,()=>a
 source=source.replace(/^import \{[^\n]+\} from '\.\.\/lib\/mts-simulation\.mjs';\n/m,()=>readFileSync(resolve(root,'lib/mts-simulation.mjs'),'utf8')+'\n');
 source=source.replace(/^import \{[^\n]+\} from '\.\.\/lib\/itsm\.mjs';\n/m,()=>readFileSync(resolve(root,'lib/itsm.mjs'),'utf8')+'\n');
 const summaryLibrary=readFileSync(resolve(root,'lib/import-summary.mjs'),'utf8').replace(/^import \{[^\n]+\} from '\.\/incidents\.mjs';\n/m,'');
-const sharedLibrary=summaryLibrary+'\n'+readFileSync(resolve(root,'lib/shared-data.mjs'),'utf8').replace(/^import \{[^\n]+\} from '\.\/(?:incidents|import-summary)\.mjs';\n/gm,'');
+const sharedLibrary=summaryLibrary+'\n'+readFileSync(resolve(root,'lib/shared-data.mjs'),'utf8').replace(/^import \{[^\n]+\} from '\.\/(?:incidents|import-summary|workflow)\.mjs';\n/gm,'');
 source=source.replace(/^import \{[^\n]+\} from '\.\.\/lib\/shared-data\.mjs';\n/m,()=>sharedLibrary+'\n');
+for(const file of ['operations','workflow','assistant-rules']){
+ const pattern=new RegExp(`^import \\{[^\\n]+\\} from '\\.\\.\\/lib\\/${file}\\.mjs';\\n`,'m');
+ const library=readFileSync(resolve(root,'lib',file+'.mjs'),'utf8').replace(/^import \{[^\n]+\} from '\.\/(?:incidents|operations|itsm)\.mjs';\n/gm,'');
+ source=source.replace(pattern,()=>library+'\n');
+}
+source=source.replace(/^export \{localAnswer\};\n/m,'');
 const incidentLibrary=readFileSync(resolve(root,'lib/incidents.mjs'),'utf8');
-const yandexLibrary=readFileSync(resolve(root,'lib/yandex.mjs'),'utf8').replace(/^import \{[^\n]+\} from '\.\/incidents\.mjs';\n/m,'');
+const yandexLibrary=readFileSync(resolve(root,'lib/yandex.mjs'),'utf8').replace(/^import \{[^\n]+\} from '\.\/(?:incidents|operations)\.mjs';\n/gm,'');
 source=source.replace(/^import \{[^\n]+\} from '\.\.\/lib\/yandex\.mjs';\n/m,()=>yandexLibrary+'\n');
 source=source.replace(/^import \{[^\n]+\} from '\.\.\/lib\/incidents\.mjs';\n/m,()=>incidentLibrary+'\n');
 const raw=readFileSync(resolve(root,'data/incidents.json'),'utf8');

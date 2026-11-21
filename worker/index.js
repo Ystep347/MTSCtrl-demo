@@ -1,21 +1,19 @@
+import {localAnswer,selectReferences} from '../lib/assistant-rules.mjs';
+export {localAnswer};
 import {canStoreAiSettings,aiEffectiveEnvironment,saveAiSettings,aiSettingsSummary} from '../lib/ai-settings.mjs';
 import {authSameOrigin,passwordSession,registerPasswordUser,loginPasswordUser,logoutPasswordUser,listPasswordUsers,setPasswordUserRole} from '../lib/auth.mjs';
 import {projectMtsSimulation} from '../lib/mts-simulation.mjs';
-import {canImportIncidents,sharedDataset,ensureSharedData,importSharedDataset,listSharedEvents,readSharedState,SHARED_MAX_BYTES} from '../lib/shared-data.mjs';
+import {canImportIncidents,sharedDataset,ensureSharedData,importSharedDataset,listSharedEvents,readSharedState,incidentRevision,SHARED_MAX_BYTES} from '../lib/shared-data.mjs';
 import {yandexAnswer,yandexStatus} from '../lib/yandex.mjs';
-import {normalizeIncidentDataset,isActiveIncident,isFinishedIncident,incidentGroups} from '../lib/incidents.mjs';
-import {attachItsmLinks} from '../lib/itsm.mjs';
+import {normalizeIncidentDataset,isActiveIncident,incidentGroups} from '../lib/incidents.mjs';
+import {acceptDemoDispatch,attachItsmLinks,sendSimpleOneAssignment,simpleOneConfiguration,simpleOneDispatchInfo} from '../lib/itsm.mjs';
+import {completeWorkflowDelivery,escalationAssessment,nextWorkflowState,relevanceOrder} from '../lib/operations.mjs';
+import {incidentAssignments,incidentWorkflowSnapshot,workflowForViewer,readIncidentWorkflow,planIncidentWorkflow,saveIncidentWorkflow} from '../lib/workflow.mjs';
 const ASSETS = /* __ASSETS__ */ {};
 const RAW_INCIDENTS = /* __INCIDENTS__ */ [];
 const FIELD_DICTIONARY = /* __ATTRIBUTES__ */ [];
-const COORDINATORS='КЦ ИТ Координаторы Массовых Инцидентов';
-const labels={working:'Выполняется',assigned:'Назначен',investigating:'Исследование',resolved:'Завершён',closed:'Закрыт'};
 const priorityLabels={critical:'Критический',high:'Высокий',medium:'Средний',low:'Низкий'};
 const rateWindows=new Map();
-const normalize=s=>String(s||'').toLocaleLowerCase('ru').replaceAll('ё','е');
-const active=isActiveIncident;
-const clock=t=>new Intl.DateTimeFormat('ru-RU',{timeZone:'Europe/Moscow',hour:'2-digit',minute:'2-digit'}).format(t);
-const shortTeam=t=>t===COORDINATORS?'Координаторы':t;
 const clip=(s,n)=>typeof s==='string'?s.slice(0,n):'';
 export function safeReturnPath(value='/'){
   if(typeof value!=='string'||!value.startsWith('/')||value.startsWith('//'))return '/';
@@ -36,44 +34,6 @@ export function currentUser(request){
 }
 const loginPath=(returnTo='/')=>'/login?return_to='+encodeURIComponent(safeReturnPath(returnTo));
 const htmlAttr=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function groupNames(i){return incidentGroups(i).map(key=>({critical:'Критические',coord:'На координаторах',high:'Высокий приоритет',research:'Исследование'})[key]);}
-function remaining(i,now){if(isFinishedIncident(i))return `Инцидент завершён. Статус: ${labels[i.status]}.`;if(i.status==='investigating')return 'Статус — исследование ситуации; продолжается разбор причин.';if(i.dueAt===null)return 'Дедлайн в выгрузке не указан.';const minutes=Math.max(1,Math.ceil(Math.abs(i.dueAt-now)/60000));return i.dueAt<now?`Срок решения нарушен на ${minutes} мин.`:`До срока решения — ${minutes} мин (до ${clock(i.dueAt)} МСК).`;}
-function row(i,now){return `${i.id} — ${i.title}\n${i.product} · ${labels[i.status]} · ${shortTeam(i.team)}\nИсполнитель: ${i.assignee}. ${remaining(i,now)}`;}
-function selectReferences(answer,incidents){const known=new Set(incidents.map(i=>i.id));return [...new Set(answer.match(/INC-?\d+/g)||[])].filter(x=>known.has(x)).slice(0,8);}
-
-export function localAnswer(question,snapshot,history=[],now=Date.now()){
-  const all=snapshot.incidents,q=normalize(question);
-  let id=q.match(/inc[-\s]?(\d+)/i)?.[0]?.toUpperCase().replace(/\s/g,'');
-  if(!id&&/(?:^|\s)(его|ему|нем|ним|он|этот|этому)(?:\s|[?.!,]|$)|сколько времени|кто решает|кому передать|объясни этот/.test(q)){
-    id=snapshot.selectedId||history.filter(m=>m.role==='user').map(m=>m.content.match(/INC[-\s]?(\d+)/i)?.[0]?.toUpperCase().replace(/\s/g,'')).filter(Boolean).at(-1);
-  }
-  const focused=id?all.find(i=>i.id.replace(/^INC-?/,'')===id.replace(/^INC-?/,'')):null;
-  if(id&&!focused)return `В текущем наборе нет инцидента ${id}. Проверьте ID или выберите карточку на дашборде.`;
-  if(focused){
-    if(/кому|переда|рекоменду|подключить команд/.test(q))return focused.recommendation?`${focused.id}: рекомендуется команда «${focused.recommendation}».\n\nОснование: продукт «${focused.product}» и описание проблемы: ${focused.description}\n\nСейчас назначен на «${shortTeam(focused.team)}». Передачу подтверждает координатор в ITSM.`:`${focused.id}: сейчас назначен на «${shortTeam(focused.team)}».\n\nВ выгрузке нет справочника владельцев продукта «${focused.product}», поэтому надёжно рекомендовать другую команду по этим данным нельзя. Координатору нужно уточнить владельца сервиса; команда по названию продукта не выдумывается.`;
-    if(/кто|исполнител|ответствен|какая команда/.test(q))return `${focused.id} решает ${focused.assignee}, команда «${shortTeam(focused.team)}».\nСтатус: ${labels[focused.status]}. ${remaining(focused,now)}`;
-    if(/врем|срок|дедлайн|sla/.test(q))return `${focused.id}: ${remaining(focused,now)}\nСоздан: ${clock(focused.createdAt)} МСК. Статус: ${labels[focused.status]}.`;
-    return `${row(focused,now)}\n\n${focused.summary||focused.description}\n\nГруппы: ${groupNames(focused).join(', ')||(isFinishedIncident(focused)?'Завершённые':'Вне четырёх групп фокуса')}. Точная техническая причина в текущих данных не подтверждена.`;
-  }
-  const open=all.filter(active),critical=open.filter(i=>i.priority==='critical').sort((a,b)=>(a.dueAt??Infinity)-(b.dueAt??Infinity)),overdue=open.filter(i=>i.dueAt!==null&&i.dueAt<now),coord=all.filter(i=>i.team===COORDINATORS&&!isFinishedIncident(i)),research=all.filter(i=>i.status==='investigating');
-  const overview=()=>`Всего в снимке: ${all.length}. В фокусе ${all.filter(i=>groupNames(i).length).length} уникальных инцидентов.\n\nАктивных: ${open.length}.\nКритических: ${critical.length}.\nПросроченных: ${overdue.length}.\nНа координаторах: ${coord.length}.\nНа исследовании: ${research.length}.\nЗавершённых и закрытых: ${all.filter(isFinishedIncident).length}.\n\n${critical.length?`Ближайший критический дедлайн: ${critical[0].id}. ${remaining(critical[0],now)}`:'Критических инцидентов сейчас нет.'}\n\nОдин инцидент может входить в несколько групп, поэтому счётчики групп не складываются.`;
-  if(/сводк/.test(q))return overview();
-  if(/что такое.*sla|что значит.*sla|объясни.*sla|что такое.*срок/.test(q))return 'SLA — согласованный срок предоставления услуги или выполнения обязательства. На этом дашборде отслеживается срок решения инцидента: время до дедлайна или длительность просрочки. На этапе исследования сервис уже восстановлен; разбор причин показывается отдельно.';
-  if(/нескольк.*групп|двух.*групп|дублир|почему.*групп/.test(q)){const overlap=all.filter(i=>groupNames(i).length>1);return 'Группы могут пересекаться, потому что проверяют разные признаки: приоритет, команду назначения и статус. Общий счётчик учитывает каждый ID один раз.\n\n'+(overlap.length?overlap.map(i=>`${i.id}: ${groupNames(i).join(', ')}.`).join('\n'):'В текущем снимке пересечений нет.');}
-  if(/просроч|наруш.*срок/.test(q))return overdue.length?`Просроченных активных инцидентов: ${overdue.length}.\n\n${overdue.map(i=>row(i,now)).join('\n\n')}\n\nНужно уточнить прогресс ответственных и необходимость эскалации.`:'Сейчас просроченных активных инцидентов нет. Решённые инциденты и исследование не считаются активной просрочкой.';
-  if(/координатор|передать/.test(q))return coord.length?`На координаторах ${coord.length} инцидента:\n\n${coord.map(i=>`${i.id} — ${i.title}\n${labels[i.status]}. Рекомендуемая команда: ${i.recommendation||'требуется уточнение'}.`).join('\n\n')}\n\nДля исследования передаются материалы разбора причин: сервис уже восстановлен.`:'У координаторов сейчас нет инцидентов для передачи.';
-  if(/исслед|разбор причин/.test(q))return research.length?`На исследовании ${research.length} инцидента. Сервисы уже восстановлены:\n\n${research.map(i=>`${i.id} — ${i.title}\nКоманда: ${shortTeam(i.team)}. ${i.team===COORDINATORS?'Нужно передать разбор профильной команде.':'Продолжается разбор причин.'}`).join('\n\n')}`:'Инцидентов на исследовании сейчас нет.';
-  if(/решен|завершен|восстановлен|закрыт/.test(q)){const solved=all.filter(i=>isFinishedIncident(i)||i.status==='investigating');return solved.length?`Завершённые и исследуемые инциденты:\n\n${solved.map(i=>`${i.id} — ${i.product}. ${labels[i.status]}.`).join('\n')}`:'В текущем наборе нет завершённых инцидентов.';}
-  if(/критич|сроч|важн|приоритет|первую очередь|сначала/.test(q)){
-    const urgent=critical.length?critical:overdue.length?overdue:open.filter(i=>i.priority==='high');
-    return urgent.length?`${critical.length?'Сначала — критические инциденты':'Приоритетное внимание'} (${urgent.length}):\n\n${urgent.slice(0,5).map(i=>row(i,now)).join('\n\n')}${critical.some(i=>i.team===COORDINATORS)?'\n\nУ критического инцидента на координаторах нужно оперативно определить профильную команду.':''}`:'Активных критических и высокоприоритетных инцидентов сейчас нет.';
-  }
-  const product=all.filter(i=>[normalize(i.product),...(normalize(i.product).includes('банк')?['банк']:[]),...(i.product==='КИОН'?['кион']:[]),...(i.product==='Сообщения'?['sms','смс']:[]),...(i.product==='Мой МТС'?['мой мтс']:[])].some(name=>name&&q.includes(name)));
-  if(product.length)return `По выбранному продукту:\n\n${product.map(i=>row(i,now)).join('\n\n')}`;
-  if(/сводк|ситуац|обзор|сколько.*инцидент|количеств|что сломалось|что происходит/.test(q))return overview();
-  return 'Сейчас включён демо-анализ по данным дашборда, без языковой модели. Я могу показать срочные и просроченные инциденты, объяснить карточку по ID, назвать исполнителя или рекомендуемую команду.\n\nНапример: «Что сейчас самое срочное?», «Какие инциденты просрочены?» или вопрос с ID из выбранной карточки. Для свободных вопросов требуется подключение модели.';
-}
-
 function json(data,status=200,extra={}){return new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...extra}});}
 async function boundedJson(request,limit){
   if(Number(request.headers.get('content-length'))>limit)throw {status:413,message:'Слишком большой JSON.'};
@@ -88,7 +48,9 @@ async function readJson(request){
   return boundedJson(request,2097152);
 }
 export async function loadIncidentData(env={}){
-  return attachItsmLinks(await loadRawIncidentData(env),env);
+  const data=await attachItsmLinks(await loadRawIncidentData(env),env);
+  data.integrations.simpleOne=simpleOneDispatchInfo(env);
+  return data;
 }
 async function loadRawIncidentData(env={}){
   if(env.DB){
@@ -127,7 +89,7 @@ function validateClientDemo(body){
   if(!Array.isArray(body.snapshot?.incidents)||body.snapshot.incidents.length>500)throw {status:400,message:'Некорректный контекст инцидентов (максимум 500).'};
   const incidents=body.snapshot.incidents.map(i=>{
     const timestamp=x=>typeof x==='number'&&Number.isFinite(x)&&x>0&&x<8640000000000000;
-    if(!i||!/^INC-?\d{1,18}$/.test(i.id)||!Object.hasOwn(labels,i.status)||!Object.hasOwn(priorityLabels,i.priority)||!timestamp(i.createdAt)||!(i.dueAt===null||timestamp(i.dueAt)))throw {status:400,message:'Некорректная карточка инцидента.'};
+    if(!i||!/^INC-?\d{1,18}$/.test(i.id)||!['assigned','working','investigating','resolved','closed'].includes(i.status)||!Object.hasOwn(priorityLabels,i.priority)||!timestamp(i.createdAt)||!(i.dueAt===null||timestamp(i.dueAt)))throw {status:400,message:'Некорректная карточка инцидента.'};
     return {id:i.id,title:clip(i.title,180),product:clip(i.product,100),priority:i.priority,status:i.status,team:clip(i.team,150),assignee:clip(i.assignee,100),description:clip(i.description,850),summary:clip(i.summary,700),recommendation:clip(i.recommendation,150),createdAt:i.createdAt,dueAt:i.dueAt};
   });
   if(new Set(incidents.map(i=>i.id)).size!==incidents.length)throw {status:400,message:'Повторяющиеся ID в контексте.'};
@@ -146,11 +108,11 @@ export async function assistantInput(body,env={}){
   if(body.context!==undefined&&(body.context===null||typeof body.context!=='object'||Array.isArray(body.context)))throw {status:400,message:'Некорректный выбор контекста.'};
   const view=body.context?.view??'source',selectedId=body.context?.selectedId??null;
   if(!['source','mts-demo'].includes(view)||selectedId!==null&&(typeof selectedId!=='string'||!/^INC-?\d{1,18}$/.test(selectedId)))throw {status:400,message:'Некорректный выбор контекста.'};
-  let source;try{source=await loadIncidentData(env);}catch{throw {status:503,message:'Не удалось получить актуальные инциденты. Повторите вопрос после восстановления источника.'};}
+  let source,workflow;try{source=await loadIncidentData(env);workflow=await incidentWorkflowSnapshot(env.DB,source.incidents);}catch{throw {status:503,message:'Не удалось получить актуальные инциденты. Повторите вопрос после восстановления источника.'};}
   if(selectedId&&!source.incidents.some(i=>i.id===selectedId))throw {status:404,message:'Выбранного инцидента больше нет в текущей выгрузке. Обновите данные и выберите карточку снова.'};
   const dataset=view==='mts-demo'?projectMtsSimulation(source):source;
   const history=Array.isArray(body.history)?body.history.slice(-8).filter(m=>m&&['user','assistant'].includes(m.role)&&typeof m.content==='string').map(m=>({role:m.role,content:m.content.slice(0,1600)})):[];
-  return {input:{question:body.question.trim(),history,snapshot:{simulation:view==='mts-demo',selectedId,incidents:dataset.incidents}},context:{mode:'server',view,simulation:view==='mts-demo',revision:source.revision,version:source.version??null,total:dataset.incidents.length,source:source.source,stale:Boolean(source.sourceWarning),sourceWarning:source.sourceWarning||null}};
+  return {input:{question:body.question.trim(),history,snapshot:{simulation:view==='mts-demo',selectedId,incidents:incidentAssignments(dataset.incidents,workflow)}},context:{mode:'server',view,simulation:view==='mts-demo',revision:source.revision,version:source.version??null,total:dataset.incidents.length,source:source.source,stale:Boolean(source.sourceWarning),sourceWarning:source.sourceWarning||null}};
 }
 function allowRequest(request,user){
   const key=user.userId;
@@ -158,6 +120,56 @@ function allowRequest(request,user){
   if(rateWindows.size>3000)for(const[k,v]of rateWindows)if(now-v.start>60000)rateWindows.delete(k);
   if(!old||now-old.start>60000){if(!old&&rateWindows.size>=3000)return false;rateWindows.set(key,{start:now,count:1});return true;}
   if(old.count>=12)return false;old.count++;return true;
+}
+async function workflowModelReply(snapshot,question,env,selectedId=null){
+  const config=await aiEffectiveEnvironment(env);
+  if(!config.YANDEX_API_KEY||!config.YANDEX_FOLDER_ID)return null;
+  return yandexAnswer({question,history:[],snapshot:{...snapshot,simulation:Boolean(snapshot.simulation),selectedId}},config,{timeout:10000});
+}
+async function workflowAnalysis(snapshot,id,env){
+  const selected=id?snapshot.incidents.find(i=>i.id===id):null;
+  if(id&&!selected)throw {status:404,message:'Инцидент больше не входит в выгрузку.'};
+  const items=selected?[selected]:relevanceOrder(snapshot.incidents.filter(i=>isActiveIncident(i)&&incidentGroups(i).length)).slice(0,8);
+  const estimates=Object.fromEntries(items.map(i=>[i.id,escalationAssessment(i)]));
+  if(!items.length)return {source:'rules',revision:snapshot.revision,estimates};
+  try{
+    const result=await workflowModelReply({...snapshot,incidents:items},
+      'Оцени релевантность и риск эскалации по названию, описанию, времени создания и сроку. Для каждого переданного ID верни только JSON-массив вида [{"id":"INC...","level":"high|medium|low","boost":0,"reason":"одно основание из контекста"}]. boost от -16 до 16, это поправка к очереди, а не процент. Критический инцидент уже эскалирован. Недостающие факты не выдумывай.',env,selected?.id);
+    if(!result)return {source:'rules',revision:snapshot.revision,estimates};
+    const rows=JSON.parse(result.answer.replace(/^\x60{3}(?:json)?\s*|\s*\x60{3}$/gi,''));
+    if(!Array.isArray(rows))throw new Error('invalid_workflow_estimates');
+    const known=new Set(items.map(item=>item.id)),model=Object.create(null);
+    for(const row of rows){
+      if(!row||!known.has(row.id)||!['high','medium','low'].includes(row.level)||!Number.isFinite(row.boost)||typeof row.reason!=='string'||!row.reason.trim())continue;
+      if(['critical','none'].includes(estimates[row.id].level))continue;
+      model[row.id]={level:row.level,boost:Math.max(-16,Math.min(16,Math.round(row.boost))),reason:row.reason.trim().slice(0,250)};
+    }
+    if(Object.keys(model).length)return {source:'yandex',revision:snapshot.revision,estimates,model};
+  }catch{}
+  return {source:'rules',revision:snapshot.revision,estimates};
+}
+
+async function acceptSimpleOneResolution(request,env,body){
+  const token=env.SIMPLEONE_EVENTS_TOKEN;
+  if(!token||!env.DB)throw {status:404,message:'Входящие события SimpleOne не настроены.'};
+  const auth=request.headers.get('authorization')||'';
+  const encoder=new TextEncoder();
+  const [expected,received]=await Promise.all(['Bearer '+token,auth].map(value=>
+    crypto.subtle.digest('SHA-256',encoder.encode(value)).then(bytes=>new Uint8Array(bytes))));
+  if(expected.reduce((diff,byte,index)=>diff|(byte^received[index]),0)!==0)throw {status:401,message:'Требуется токен событий SimpleOne.'};
+  if(body.event!=='resolved'||typeof body.solution!=='string'||!/^[a-f0-9]{32}$/.test(body.dispatchId))
+    throw {status:422,message:'Ожидается подтверждение решения с ID передачи и описанием.'};
+  const snapshot=await loadIncidentData(env);
+  const item=snapshot.incidents.find(item=>item.id===body.incidentId&&item.sysId===body.sysId);
+  if(!item)throw {status:404,message:'Инцидент отсутствует в текущей выгрузке.'};
+  const current=await readIncidentWorkflow(env.DB,item),dispatch=current?.dispatch;
+  if(dispatch?.state!=='sent'||dispatch.id!==body.dispatchId||dispatch.groupId!==body.assignmentGroupId)
+    throw {status:409,message:'Подтверждение относится к другой передаче или команде.'};
+  if(current.caseStatus||['resolved','investigating','closed'].includes(item.status))return {received:true,alreadyResolved:true};
+  const actor={role:'executor',dispatchId:dispatch.id,displayName:current.team+' · SimpleOne'};
+  const next=nextWorkflowState(item,current,{action:'resolve',version:current.version,note:body.solution},actor);
+  await saveIncidentWorkflow(env.DB,snapshot,next);
+  return {received:true};
 }
 export default {
   async fetch(request,env={}){
@@ -187,10 +199,68 @@ export default {
     if(url.pathname==='/api/incidents'){
       if(request.method!=='GET')return json({error:'Метод не поддерживается.'},405,{'Allow':'GET'});
       try{
-        const data=await loadIncidentData(env),etag='"'+data.representationRevision+'"';
+        const data=await loadIncidentData(env);
+        const workflow=await incidentWorkflowSnapshot(env.DB,data.incidents);
+        data.workflow=workflow.map(row=>workflowForViewer(row,user));
+        const suffix=workflow.length||data.integrations.simpleOne.mode!=='demo'
+          ?'-'+(await incidentRevision([data.workflow,data.integrations.simpleOne])).slice(0,20):'';
+        const etag='"'+data.representationRevision+suffix+'"';
         if(!data.sourceWarning&&request.headers.get('if-none-match')===etag)return new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':'no-store'}});
         return json(data,200,{ETag:etag});
       }catch{return json({error:'Не удалось прочитать выгрузку. Проверьте JSON, статусы и даты источника.',code:'incident_source_unavailable'},503);}
+    }
+    if(url.pathname==='/api/simpleone/demo'||url.pathname==='/api/simpleone/events'){
+      if(request.method!=='POST')return json({error:'Метод не поддерживается.'},405,{Allow:'POST'});
+      const demo=url.pathname.endsWith('/demo');
+      if(demo&&!authSameOrigin(request))return json({error:'Недопустимый источник запроса.'},403);
+      if(!request.headers.get('content-type')?.includes('application/json'))return json({error:'Отправьте JSON.'},415);
+      try{
+        const body=await boundedJson(request,8192);
+        if(!body||typeof body!=='object'||Array.isArray(body))throw {status:400,message:'Некорректное тело запроса.'};
+        return json(demo?acceptDemoDispatch(body):await acceptSimpleOneResolution(request,env,body));
+      }catch(error){return json({error:error.status?error.message:'Не удалось обработать сообщение SimpleOne.'},error.status||503);}
+    }
+    if(url.pathname==='/api/workflow'||url.pathname==='/api/workflow/analysis'){
+      if(!user)return json({error:'Войдите в учётную запись для совместной работы.'},401);
+      if(!env.DB)return json({error:'Хранилище назначений недоступно.'},503);
+      const analysis=url.pathname.endsWith('/analysis');
+      if(request.method!=='POST')return json({error:'Метод не поддерживается.'},405,{Allow:'POST'});
+      if(!authSameOrigin(request))return json({error:'Недопустимый источник запроса.'},403);
+      if(!request.headers.get('content-type')?.includes('application/json'))return json({error:'Отправьте JSON.'},415);
+      try{
+        const body=await boundedJson(request,8192);
+        if(!body||typeof body!=='object'||Array.isArray(body))throw {status:400,message:'Некорректные данные операции.'};
+        const source=await loadIncidentData(env),snapshot=body.view==='mts-demo'?projectMtsSimulation(source):source;
+        if(analysis){
+          if(!allowRequest(request,user))return json({error:'Повторите запрос позже.'},429);
+          return json(await workflowAnalysis(snapshot,body.id,env));
+        }
+        if(body.action==='demo-executor-resolve'){
+          const item=source.incidents.find(item=>item.id===body.id);
+          if(!item)throw {status:404,message:'Инцидент отсутствует в текущей выгрузке.'};
+          const current=await readIncidentWorkflow(env.DB,item);
+          if(current?.dispatch?.state!=='demo'||current.dispatch.id!==body.dispatchId)
+            throw {status:409,message:'Учебное назначение изменилось.'};
+          const executor={role:'executor',dispatchId:current.dispatch.id,displayName:current.team+' · учебный SimpleOne'};
+          const next=nextWorkflowState(item,current,{...body,action:'resolve'},executor);
+          return json({workflow:workflowForViewer(await saveIncidentWorkflow(env.DB,source,next),user)});
+        }
+        const delivery=['assign','retry'].includes(body.action);
+        const config=delivery?simpleOneConfiguration(env):null;
+        const {item,next}=await planIncidentWorkflow(env.DB,snapshot,body,user,config);
+        if(body.action==='assign'&&allowRequest(request,user)){
+          try{
+            const question='Для передачи '+item.id+' подготовь короткий черновик для исполнительной команды. Назови известные симптомы, факты, срок и что проверить дальше. Получатель: '+next.team+'. Комментарий передающего: '+JSON.stringify(String(body.note||'').slice(0,500))+'. Не достраивай историю выполненных работ.';
+            const model=await workflowModelReply({...snapshot,incidents:[item]},question,env,item.id);
+            if(model){next.report+='\n\nЧерновик Яндекса · сверить по карточке\n'+model.answer.slice(0,3000);next.reportSource='yandex';}
+          }catch{}
+        }
+        await saveIncidentWorkflow(env.DB,source,next);
+        if(!delivery)return json({workflow:workflowForViewer(next,user)});
+        const state=await sendSimpleOneAssignment(item,next,config);
+        const finished=completeWorkflowDelivery(next,state,user);
+        return json({workflow:workflowForViewer(await saveIncidentWorkflow(env.DB,source,finished),user)});
+      }catch(error){return json({error:error.status?error.message:'Не удалось выполнить действие. Повторите попытку.'},error.status||503);}
     }
     if(url.pathname==='/api/incidents/import'){
       if(request.method!=='POST')return json({error:'Метод не поддерживается.'},405,{Allow:'POST'});
@@ -206,7 +276,10 @@ export default {
         await ensureSharedData(env.DB,RAW_INCIDENTS);
         let name;try{name=decodeURIComponent(request.headers.get('x-source-name')||'Обновлённая выгрузка');}catch{return json({error:'Некорректное имя файла.'},400);}
         const result=await importSharedDataset(env.DB,raw,match[1],user,name);
-        let snapshot=null;try{snapshot=await loadIncidentData(env);}catch{}
+        let snapshot=null;try{
+          const current=await loadIncidentData(env);
+          snapshot={...current,workflow:(await incidentWorkflowSnapshot(env.DB,current.incidents)).map(row=>workflowForViewer(row,user))};
+        }catch{}
         return json({...result,snapshot,refreshRequired:!snapshot});
       }catch(e){return json({error:e.status?e.message:'Не удалось подтвердить сохранение. Обновите данные и проверьте историю.'},e.status||503);}
     }

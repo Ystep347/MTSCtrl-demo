@@ -2,7 +2,10 @@ import {projectMtsSimulation,mtsSimulationEvent} from '/mts-simulation.js';
 import {dashboardAnalytics,slaBucket} from '/dashboard-analytics.js';
 import {renderReference} from '/reference-view.js';
 import {summarizeImport} from '/import-summary.js';
-import {incidentChanges,isActiveIncident,isFinishedIncident,normalizeIncidentDataset} from '/incidents.js';
+import {criticalRecoveryEvent,incidentChanges,isActiveIncident,isFinishedIncident,normalizeIncidentDataset} from '/incidents.js';
+import {matchesIncidentScope,operationalEvidence,projectWorkflowItem,workGroupKeys} from '/operations.js';
+import {createOperations} from '/operations-ui.js';
+import {localAnswer,selectReferences} from '/assistant-rules.js';
 "use strict";
 
 const ICONS = {
@@ -49,25 +52,78 @@ const shortTeam = team => team===COORDINATORS ? "Координаторы" : tea
 const isOpen = isActiveIncident;
 const isDone = isFinishedIncident;
 const isOverdue = item => isOpen(item) && item.dueAt!==null && item.dueAt < Date.now();
-const GROUPS = [
-  {key:"critical",title:"Критические",icon:"alert",hint:"Восстановление сервиса в приоритете",test:i=>i.priority==="critical"&&isOpen(i)},
-  {key:"coord",title:"На координаторах",icon:"users",hint:"Требуется передача профильной команде",test:i=>i.team===COORDINATORS&&!isDone(i)},
-  {key:"high",title:"Высокий приоритет",icon:"bolt",hint:"Требуют внимания до эскалации",test:i=>i.priority==="high"&&isOpen(i)},
-  {key:"research",title:"Исследование",icon:"research",hint:"Сервис восстановлен · идёт разбор причин",test:i=>i.status==="investigating"}
-];
-const groupsFor = item => GROUPS.filter(g=>g.test(item));
-const state = {view:"dashboard",layout:"queue",search:"",product:"all",overdue:false,coordinator:false,priority:"all",group:null,selected:null,drawerTab:"overview",demoRunning:false,demoTimer:null,demoStep:0,nextId:2071,lastUpdate:Date.now(),unread:false,compact:false,showAll:false};
+const workGroups=[
+  {key:'coord',title:'На координаторах',icon:'users'},
+  {key:'critical',title:'Критические',icon:'alert'},
+  {key:'high',title:'Высокий приоритет',icon:'bolt'},
+  {key:'medium',title:'Средний приоритет',icon:'list'},
+  {key:'low',title:'Низкий приоритет',icon:'list'},
+  {key:'research',title:'Исследование',icon:'research'},
+  {key:'resolved',title:'Решённые',icon:'checkCircle'},
+  {key:'closed',title:'Закрытые',icon:'archive'}
+].map(group=>({...group,test:item=>workGroupKeys(item).includes(group.key)}));
+const GROUPS=workGroups.filter(g=>['coord','critical','high','research'].includes(g.key));
+const groupsFor=item=>GROUPS.filter(g=>g.test(item));
+const state = {view:"dashboard",layout:"board",sort:"relevance",search:"",product:"all",overdue:false,coordinator:false,priority:"all",group:null,selected:null,drawerTab:"overview",demoRunning:false,demoTimer:null,demoStep:0,lastUpdate:Date.now(),unread:false,compact:false,team:null};
 // Presentation preferences only. Source records, groups and permissions stay unchanged.
-const presentation={datasetView:new URLSearchParams(location.search).get('dataset')==='source'?'source':'mts-demo',screen:new URLSearchParams(location.search).get('screen')==='wallboard'?'wallboard':'workstation',spotlight:null,bucket:null,scope:'focus',donut:'statuses',interval:6,showTeams:false,pins:[],trend:[]};
-try{const pins=JSON.parse(localStorage.getItem('mts-ctrl-pins')||'[]');if(Array.isArray(pins))presentation.pins=pins.filter(x=>typeof x==='string').slice(0,100);}catch{}
+const presentation={datasetView:new URLSearchParams(location.search).get('dataset')==='source'?'source':'mts-demo',screen:new URLSearchParams(location.search).get('screen')==='wallboard'?'wallboard':'workstation',spotlight:null,bucket:null,scope:'focus',interval:6};
 const assistant={messages:[],configuration:null,pending:false,contextId:null,lastFocus:null,generation:0,controller:null};
 const auth={checking:true,canImport:false,user:null,error:null,loginUrl:'/login',assistantLoginUrl:'/login?return_to=%2F%3Fassistant%3D1',logoutUrl:'/signout-with-chatgpt?return_to=%2F'};
-let items=[],events=[],lastFocus=null;
+let items=[],baseItems=[],events=[],guestRecoveries=[],lastFocus=null;
+const announcedRecoveries=new Set();
+function announceEvents(changes){
+  const rank=e=>e.id?.toString().startsWith('recovery:')||e.type==='critical'?0:e.type==='coord'?1:2;
+  const important=changes.filter(e=>['critical','coord','success'].includes(e.type)).sort((a,b)=>rank(a)-rank(b));
+  for(const e of important.slice(0,3)){
+    if(String(e.id).startsWith('recovery:')){
+      if(announcedRecoveries.has(e.id))continue;
+      announcedRecoveries.add(e.id);
+    }
+    toast(e.title,`${e.incidentId||''} · ${e.detail}`,e.type);
+  }
+  return important.length;
+}
+const guestView=new URL(location.href).searchParams.get('guest')==='1';
 
 const sourceData={snapshot:null,originalSnapshot:null,etag:null,revision:null,source:null,meta:null,busy:false,error:null,warning:null,checkedAt:null,frozen:false,lastSeq:0,historyCursor:null,historyHasMore:false};
 const importState={raw:null,preview:null,filename:'',base:null,error:null,pending:false,stale:false};
 const cardHistory=new Map();
 let lastClockSignature='';
+const operations=createOperations(()=>({
+  auth,items,baseItems,workGroups,esc,isOpen,isDone,screen:presentation.screen,view:presentation.datasetView,
+  selected:presentation.spotlight,snapshot:sourceData.snapshot,revision:sourceData.revision,frozen:sourceData.frozen,
+  coordinatorTeam:COORDINATORS,reload:loadIncidents,
+  applyWorkflow(row){
+    if(sourceData.snapshot){
+      const rows=(sourceData.snapshot.workflow||[]).filter(old=>old.id!==row.id||old.sysId!==row.sysId);
+      sourceData.snapshot={...sourceData.snapshot,workflow:[...rows,row]};
+    }
+    rebuildItems();render();
+  }
+}),refreshOperations,toast);
+function rebuildItems(){
+  const demos=operations.demos();
+  const localIds=new Set(demos.map(item=>item.id));
+  const source=[...demos,...baseItems.filter(item=>!localIds.has(item.id))];
+  const rows=operations.book(source);
+  const previous=items;
+  items=source.map(item=>projectWorkflowItem(item,rows[item.id]));
+  guestRecoveries=operations.isGuest()?items.flatMap(item=>{
+    const local=operations.guestRow(item);
+    const at=local?.resolvedAt||(item.guestDemo&&!isOpen(item)?item.resolvedAt:null);
+    if(!at||!(local?.criticalRecovery??(item.priority==='critical')))return [];
+    return [{...criticalRecoveryEvent(item),at}];
+  }):[];
+  const newlyRecovered=guestRecoveries.filter(e=>previous.some(i=>i.id===e.incidentId&&isOpen(i)));
+  if(newlyRecovered.length){state.unread=true;announceEvents(newlyRecovered);}
+}
+function refreshOperations(syncDemo=false){
+  if(syncDemo){
+    rebuildItems();
+    refreshProducts();renderAccount();refreshAssistantAuth();
+  }
+  render();
+}
 function renderDataStatus(){
   $("#dataset-view-toggle").disabled=sourceData.busy;
   const el=$("#data-status"),expanded=Boolean(el.querySelector('details')?.open);
@@ -101,29 +157,31 @@ function acceptSnapshot(snapshot,reset=false){
     const first=!sourceData.snapshot||sourceData.source!=='shared'||reset,stamp=Date.now();
     const incoming=snapshot.events||[],newEvents=first?[]:incoming.filter(e=>e.seq>sourceData.lastSeq);
     const historyGap=!first&&incoming.length===100&&Math.min(...incoming.map(e=>e.seq))>sourceData.lastSeq;
-    items=snapshot.incidents.map(i=>({...i,history:[...i.history]}));
+    baseItems=snapshot.incidents.map(i=>({...i,history:[...i.history]}));
     events=first||historyGap?incoming:[...new Map([...events.filter(e=>e.seq),...incoming].map(e=>[e.id,e])).values()].sort((a,b)=>b.seq-a.seq);
     sourceData.snapshot=snapshot;sourceData.revision=snapshot.revision;sourceData.source=snapshot.source;sourceData.meta=snapshot.meta;sourceData.warning=snapshot.sourceWarning||null;
+    rebuildItems();
     if(first||historyGap){sourceData.historyCursor=snapshot.historyCursor;sourceData.historyHasMore=snapshot.historyHasMore;}
     sourceData.lastSeq=Math.max(sourceData.lastSeq,...incoming.map(e=>e.seq),0);state.lastUpdate=snapshot.updatedAt||stamp;
-    if(newEvents.length){state.unread=true;const important=newEvents.filter(e=>['critical','coord','success'].includes(e.type));for(const e of important.slice(0,3))toast(e.title,`${e.incidentId||''} · ${e.detail}`,e.type);if(!important.length)toast('Общие данные обновлены',`Новая версия: ${snapshot.version}`,'changed');}
+    if(newEvents.length){state.unread=true;if(!announceEvents(newEvents))toast('Общие данные обновлены',`Новая версия: ${snapshot.version}`,'changed');}
     if($('#import-dialog').open&&importState.base?.revision!==snapshot.revision&&!importState.pending){importState.stale=true;importState.error='Другой редактор обновил данные. Обновите предпросмотр.';renderImportPreview();}
     refreshProducts();render();
     if(state.selected&&state.drawerTab==='history')loadCardHistory(state.selected);
     return;
   }
-  const first=!sourceData.snapshot||reset,previous=items;
+  const first=!sourceData.snapshot||reset,previous=baseItems;
   const changes=first?[]:incidentChanges(previous,snapshot.incidents);
   const stamp=Date.now(),old=new Map(previous.map(i=>[i.id,i]));
-  items=snapshot.incidents.map(i=>({...i,history:[...i.history,...(!first?(old.get(i.id)?.history||[]).filter(e=>e.observed):[])]}));
+  baseItems=snapshot.incidents.map(i=>({...i,history:[...i.history,...(!first?(old.get(i.id)?.history||[]).filter(e=>e.observed):[])]}));
   sourceData.snapshot=snapshot;sourceData.revision=snapshot.revision;sourceData.source=snapshot.source;sourceData.meta=snapshot.meta;
+  rebuildItems();
   if(first){events=items.flatMap(i=>i.history.map(e=>({...e,id:`${i.id}-${e.at}-${e.title}`,incidentId:i.id,type:'changed'}))).sort((a,b)=>b.at-a.at).slice(0,100);}
   for(const [index,change] of changes.entries()){
-    const event={...change,at:stamp,id:`${stamp}-${index}`};events.unshift(event);
+    const event={...change,at:stamp,id:change.id||`${stamp}-${index}`};events.unshift(event);
     items.find(i=>i.id===change.incidentId)?.history.push({...event,observed:true});
   }
   events=events.slice(0,200);state.lastUpdate=stamp;
-  if(changes.length){state.unread=true;const important=changes.filter(c=>c.type==='critical'||c.type==='coord'||c.type==='success');for(const e of important.slice(0,3))toast(e.title,`${e.incidentId} · ${e.detail}`,e.type);if(!important.length)toast('Выгрузка обновлена',`Изменений: ${changes.length}`,'changed');}
+  if(changes.length){state.unread=true;if(!announceEvents(changes))toast('Выгрузка обновлена',`Изменений: ${changes.length}`,'changed');}
   refreshProducts();render();
 }
 async function loadIncidents(reset=false){
@@ -131,7 +189,7 @@ async function loadIncidents(reset=false){
   sourceData.busy=true;renderDataStatus();
   try{
     const headers=sourceData.etag&&!reset?{'If-None-Match':sourceData.etag}:{};
-    const response=await fetch('/api/incidents',{cache:'no-store',headers,signal:AbortSignal.timeout(10000)});
+    const response=await fetch('/api/incidents',{cache:'no-store',credentials:guestView?'omit':'same-origin',headers,signal:AbortSignal.timeout(10000)});
     if(response.status!==304){
       if(!response.ok)throw new Error('Не удалось обновить выгрузку. Последний полученный снимок сохранён.');
       const snapshot=await response.json();
@@ -218,11 +276,18 @@ $('#import-refresh-preview').addEventListener('click',refreshImportPreview);
 for(const id of ['import-close','import-cancel'])$('#'+id).addEventListener('click',()=>{if(!importState.pending)$('#import-dialog').close();});
 $('#import-dialog').addEventListener('cancel',event=>{if(importState.pending)event.preventDefault();});
 
-function matching(){
-  const query=state.search.trim().toLocaleLowerCase("ru");
-  return items.filter(i=>(state.showAll||!isDone(i))&&(!presentation.bucket||slaBucket(i)===presentation.bucket)&&(presentation.scope!=='active'||isOpen(i))&&(presentation.scope!=='finished'||isDone(i))&&(!query||[i.id,i.title,i.product,i.team,i.assignee].join(" ").toLocaleLowerCase("ru").includes(query))&&(state.product==="all"||i.product===state.product)&&(!state.overdue||isOverdue(i))&&(!state.coordinator||i.team===COORDINATORS)&&(state.priority==="all"||i.priority===state.priority)&&(!state.group||GROUPS.find(g=>g.key===state.group).test(i)));
+function filteredItems(now=Date.now()){
+  const query=state.search.trim().toLocaleLowerCase('ru');
+  return items.filter(i=>
+    (!presentation.bucket||isOpen(i)&&(slaBucket(i,now)||'none')===presentation.bucket)&&
+    (!query||[i.id,i.title,i.product,i.service,i.team,i.assignee,i.summary,i.description].join(' ').toLocaleLowerCase('ru').includes(query))&&
+    (state.product==='all'||i.product===state.product)&&(!state.overdue||isOverdue(i))&&
+    (!state.coordinator||i.team===COORDINATORS)&&(!state.team||i.team===state.team)&&
+    (state.priority==='all'||i.priority===state.priority));
 }
-function sortItems(list){return [...list].sort((a,b)=>Number(!isOpen(a))-Number(!isOpen(b))||Number(isDone(a))-Number(isDone(b))||({critical:0,high:1,medium:2,low:3}[a.priority]-{critical:0,high:1,medium:2,low:3}[b.priority])||(a.dueAt??Infinity)-(b.dueAt??Infinity)||a.id.localeCompare(b.id));}
+function matching(list=filteredItems()){
+  return list.filter(i=>matchesIncidentScope(i,presentation.scope)&&(!state.group||workGroupKeys(i).includes(state.group)));
+}
 function timerText(i,kind="card"){
   if(isDone(i))return kind==="big"?"Инцидент завершён":STATUS[i.status];
   if(i.status==="investigating")return kind==="big"?"Сервис восстановлен":"Разбор причин";
@@ -237,31 +302,49 @@ function deadlineMarkup(i,kind="card"){return `<span data-countdown-id="${esc(i.
 function progress(i){if(i.dueAt===null)return 0;const end=i.resolvedAt||Date.now();return Math.max(0,Math.min(100,(end-i.createdAt)/Math.max(i.dueAt-i.createdAt,1)*100));}
 function eventIcon(type){return type==="critical"?"alert":type==="success"?"checkCircle":type==="coord"?"users":"clock";}
 function eventMarkup(e,journal=false){if(presentation.datasetView==='mts-demo')e=mtsSimulationEvent(e);return `<button class="event-item" ${items.some(i=>i.id===e.incidentId)?`data-open="${esc(e.incidentId)}"`:'disabled'}><span class="event-icon ${esc(e.type)}">${icon(eventIcon(e.type))}</span><span class="event-copy"><strong>${esc(e.title)}</strong><p>${e.incidentId?esc(e.incidentId)+" · ":""}${esc(e.detail)}</p><time>${fmtFullTime(e.at)} МСК${e.actor?" · "+esc(e.actor):""}</time></span>${journal?'<span class="event-open">Открыть карточку</span>':""}</button>`;}
-function cardMarkup(i){
-  const dc=deadlineClass(i);
-  return `<button class="incident-card ${i.isNew?"just-arrived":""}" data-open="${esc(i.id)}" aria-label="${esc(i.id+": "+i.title)}">
-    <span class="card-topline"><span class="incident-id">${esc(i.id)}</span><span class="card-tags">${i.isNew?'<span class="new-tag">Новый</span>':""}<span class="status ${esc(i.status)}">${STATUS[i.status]}</span></span></span>
-    <span class="card-title">${esc(i.title)}</span>
-    <span class="card-middle"><span class="card-product">${icon("box")}<span>${esc(i.product)}</span></span><span class="deadline ${dc}" title="${!isOpen(i)?"Сервис восстановлен":isOverdue(i)?"Срок решения нарушен":"До срока решения"}">${icon(isOpen(i)?"timer":"checkCircle")}${deadlineMarkup(i)}</span></span>
-    <span class="card-assignment">${esc(shortTeam(i.team))}</span><span class="card-bottom"><span class="card-team" title="${esc(i.assignee+" · "+shortTeam(i.team))}"><span class="avatar-mini ${i.team===COORDINATORS?"coord":""}">${esc(initials(i.assignee))}</span><span>${esc(i.assignee)}</span></span><span title="${fmtFullTime(i.createdAt)} МСК">с ${fmtTime(i.createdAt)}</span></span>
-    ${isOpen(i)?`<span class="mini-progress"><span class="${dc}" style="width:${progress(i)}%" data-progress-id="${esc(i.id)}"></span></span>`:""}
-  </button>`;
+function priorityBadge(item,pending){
+  const alert=pending&&isOpen(item)&&item.priority==='critical';
+  return `<span class="priority-badge ${item.priority}${alert?' critical-alert':''}"${alert?' title="Критический инцидент ждёт реакции"':''}>${PRIORITY[item.priority]}</span>`;
 }
-function ctrlContext(){return {items,events,state,presentation,sourceData,COORDINATORS,STATUS,PRIORITY,GROUPS,groupsFor,isOpen,isDone,isOverdue,sortItems,shortTeam,initials,icon,deadlineClass,deadlineMarkup,progress,matching,queueMembers,renderBoard,renderTable,eventMarkup,simpleOneLink};}
+function cardMarkup(i,rows,wall){
+  const dc=deadlineClass(i),assignment=operations.assignment(i,rows),element=wall?'article':'button';
+  return `<${element} class="incident-card work-incident" ${wall?'':`data-open="${esc(i.id)}" aria-label="${esc(i.id+": "+i.title)}"`}>
+    <span class="card-topline"><span class="incident-id">${esc(i.id)}</span><span class="card-tags">${assignment.pending?'<span class="new-tag">Ждёт реакции</span>':''}${priorityBadge(i,assignment.pending)}</span></span>
+    <span class="card-title">${esc(i.title)}</span>
+    <span class="card-middle"><span class="card-product">${icon("box")}<span>${esc(i.product)}${i.service?' · '+esc(i.service):''}</span></span><span class="deadline ${dc}" title="${!isOpen(i)?"Сервис восстановлен":isOverdue(i)?"Срок решения нарушен":"До срока решения"}">${icon(isOpen(i)?"timer":"checkCircle")}${deadlineMarkup(i)}</span></span>
+    <span class="card-assignment">${esc(shortTeam(assignment.team))} · ${esc(STATUS[i.status])}${assignment.phase?' · '+esc(assignment.phase):''}</span>
+    ${wall?`<span class="wall-owner">${esc(assignment.person)} · ${fmtFullTime(i.createdAt)} МСК</span>`:`<span class="work-incident-summary">${esc(i.summary||i.description)}</span><span class="card-bottom"><span class="card-team"><span class="avatar-mini">${esc(initials(assignment.person))}</span><span>${esc(assignment.person)}</span></span><span title="${fmtFullTime(i.createdAt)} МСК">с ${fmtTime(i.createdAt)}</span></span>`}
+  </${element}>`;
+}
+function visibleEvents(){return [...new Map([...events,...guestRecoveries].map(event=>[event.id,event])).values()].sort((a,b)=>b.at-a.at);}
+function ctrlContext(){return {items,events:visibleEvents(),state,presentation,sourceData,COORDINATORS,STATUS,PRIORITY,isOpen,isDone,isOverdue,shortTeam,initials,icon,deadlineClass,deadlineMarkup,progress,filteredItems,matching,matchesIncidentScope,renderBoard,renderTable,eventMarkup,simpleOneLink,operations};}
 function renderTop(){if(state.view==='dashboard')renderReference(ctrlContext());}
-function renderBoard(list){
-  return `<div class="board-heading"><h2>Обзор по группам</h2><p>${icon("refresh")}Обновлено в ${fmtTime(state.lastUpdate)}</p></div><div class="board">${GROUPS.map(g=>{
-    const members=sortItems(list.filter(g.test));
-    const recovered=g.key==="critical"?items.filter(i=>i.priority==="critical"&&isDone(i)).sort((a,b)=>b.resolvedAt-a.resolvedAt)[0]:null;
-    return `<section class="incident-group group-${g.key}" id="group-${g.key}" aria-label="${esc(g.title)}"><header class="group-head"><div class="group-title-row"><span class="group-symbol">${icon(g.icon)}</span><h3>${g.title}</h3><span class="group-count">${members.length}</span></div><button class="group-more" data-group="${g.key}" aria-label="Показать группу ${esc(g.title)} в таблице">${icon("list")}</button></header><div class="group-cards">${members.length?members.map(cardMarkup).join(""):`<div class="empty-group">${icon("checkCircle")}${state.search||state.product!=="all"||state.overdue||state.coordinator||state.priority!=="all"||state.group?"Нет совпадений с фильтрами":"Нет инцидентов в этой группе"}</div>`}</div>${recovered?`<button class="recovery-strip" data-open="${recovered.id}">${icon("checkCircle")}<span><strong>${recovered.id} решён.</strong> Сервис «${esc(recovered.product)}» восстановлен</span></button>`:""}<div class="group-foot">${icon(g.key==="research"?"checkCircle":"info")}${g.hint}</div></section>`;
-  }).join("")}</div><p class="board-note">${icon("info")}Группы пересекаются: один инцидент может быть и критическим, и на координаторах.</p>`;
+function renderBoard(list,wall=false){
+  const rows=operations.book();
+  const definitions=wall||presentation.scope==='focus'?GROUPS:workGroups;
+  const visible=wall||!state.group?definitions:definitions.filter(g=>g.key===state.group);
+  const groups=operations.groups(list,visible,{wall,mode:state.sort});
+  const heading=wall?'':`<div class="board-heading"><h2>Группы инцидентов</h2><div class="board-actions">${operations.rankingButton()}</div></div>`;
+  if(!groups.length)return heading+`<div class="empty-full">${icon("checkCircle")}<h2>${wall?'В фокусе сейчас тихо':'Нет инцидентов по выбранным условиям'}</h2></div>`;
+  const wallRows=innerWidth<=560?Math.ceil(groups.length/2):1;
+  const boardHeight=wall?$('#wallboardBoard').clientHeight/wallRows:0;
+  const maxCards=Math.max(1,Math.min(9,Math.floor((boardHeight-104)/Math.max(112,Math.min(190,innerWidth*.037)))));
+  return heading+`<div class="board work-board" style="--group-count:${groups.length}">${groups.map(g=>{
+    const cards=wall?g.members.slice(0,maxCards):g.members;
+    const title=`<span class="group-symbol">${icon(g.icon)}</span>`;
+    const count=`<span class="group-count">${g.members.length}</span>`;
+    const focused=state.group===g.key;
+    const header=wall?`<header class="group-head"><div class="group-title-row">${title}<h3>${g.title}</h3>${count}</div></header>`:
+      `<header class="group-head group-head-toggle"><h3><button type="button" class="group-toggle group-title-row" data-focus-group="${g.key}" aria-pressed="${focused}" aria-controls="incidentQueueList" title="${focused?'Вернуть все группы':'Развернуть группу'}">${title}<span>${g.title}</span>${count}<span class="group-toggle-icon">${icon('focus')}</span></button></h3></header>`;
+    return `<section class="incident-group group-${g.key}${g.urgent?' workflow-pulse':''}${g.criticalAlert?' workflow-pulse-critical':''}" aria-label="${esc(g.title)}">${header}<div class="group-cards">${cards.map(i=>cardMarkup(i,rows,wall)).join("")}</div>${cards.length<g.members.length?`<div class="wallboard-more">Ещё ${g.members.length-cards.length} в группе</div>`:''}</section>`;
+  }).join("")}</div>`;
 }
 function renderTable(list){
+  const rows=operations.book();
   if(!list.length)return `<div class="empty-full">${icon("search")}<h2>Ничего не найдено</h2><p>Попробуйте другой запрос или сбросьте фильтры.</p></div>`;
-  return `<div class="table-panel"><div class="table-scroll"><table class="incidents-table"><thead><tr><th>Инцидент</th><th>Продукт</th><th>Приоритет</th><th>Исполнитель</th><th>Статус</th><th>До срока</th><th>Группы</th></tr></thead><tbody>${sortItems(list).map(i=>`<tr data-open="${i.id}" tabindex="0" role="button" aria-label="Открыть ${i.id}"><td class="table-incident"><span class="incident-id">${i.id}</span><strong>${esc(i.title)}</strong></td><td>${esc(i.product)}</td><td><span class="priority-badge ${i.priority}">${PRIORITY[i.priority]}</span></td><td>${esc(i.assignee)}</td><td><span class="status ${i.status}">${STATUS[i.status]}</span></td><td><span class="deadline ${deadlineClass(i)}">${deadlineMarkup(i)}</span></td><td><span class="table-groups">${groupsFor(i).map(g=>`<span class="group-badge ${g.key}">${g.title}</span>`).join("")}</span></td></tr>`).join("")}</tbody></table></div><div class="table-meta"><span>${list.length} уникальных инцидентов</span><span>Откройте строку для подробностей</span></div></div>`;
+  return `<div class="table-panel"><div class="table-scroll"><table class="incidents-table"><thead><tr><th>Инцидент</th><th>Продукт</th><th>Приоритет</th><th>Команда и исполнитель</th><th>Статус</th><th>До срока</th><th>Поступил, МСК</th><th>ITSM</th></tr></thead><tbody>${operations.order(list,state.sort).map(i=>`<tr data-open="${i.id}" tabindex="0" role="button" aria-label="Открыть ${i.id}"><td class="table-incident"><span class="incident-id">${i.id}</span><strong>${esc(i.title)}</strong></td><td>${esc(i.product)}</td><td>${priorityBadge(i,operations.pending(i,rows))}</td><td>${esc(shortTeam(i.team))}<small>${esc(i.assignee)}</small></td><td><span class="status ${i.status}">${STATUS[i.status]}</span></td><td><span class="deadline ${deadlineClass(i)}">${deadlineMarkup(i)}</span></td><td>${fmtFullTime(i.createdAt)}</td><td>${simpleOneLink(i,'text-button')}</td></tr>`).join("")}</tbody></table></div><div class="table-meta"><span>${list.length} уникальных инцидентов</span><span>Откройте строку для подробностей</span></div></div>`;
 }
-function hasFilters(){return Boolean(state.search||state.product!=="all"||state.overdue||state.coordinator||state.priority!=="all"||state.group||presentation.bucket||presentation.scope!=='focus');}
-function queueMembers(list){return sortItems(state.showAll||hasFilters()?list:list.filter(i=>groupsFor(i).length));}
+function hasFilters(){return Boolean(state.team||state.search||state.product!=="all"||state.overdue||state.coordinator||state.priority!=="all"||state.group||presentation.bucket||presentation.scope!=='focus');}
 function renderScreen(){
   renderReference(ctrlContext());
   if(state.view!=='dashboard')$('#alternate-screen').innerHTML=state.view==='journal'?renderJournal():renderTeams();
@@ -280,12 +363,13 @@ function syncPresentation(){
   if(url.href!==location.href)history.replaceState(null,'',url);
   renderLiveStatus();
 }
-function renderJournal(){return `<section class="table-panel"><header class="journal-heading"><h2>История изменений</h2><span>${events.length} событий · МСК</span></header><div class="journal-list">${events.map(e=>eventMarkup(e,true)).join("")}</div>${sourceData.source==="shared"&&sourceData.historyHasMore?`<button class="history-more" data-history-more>Показать более ранние события</button>`:""}</section>`;}
+function renderJournal(){const events=visibleEvents();return `<section class="table-panel"><header class="journal-heading"><h2>История изменений</h2><span>${events.length} событий · МСК</span></header><div class="journal-list">${events.map(e=>eventMarkup(e,true)).join("")}</div>${sourceData.source==="shared"&&sourceData.historyHasMore?`<button class="history-more" data-history-more>Показать более ранние события</button>`:""}</section>`;}
 function renderTeams(){
   const teams=[...new Set(items.filter(i=>!isDone(i)).map(i=>i.team))];
-  return `<section class="teams-grid" aria-label="Команды назначения">${teams.map(team=>{const own=items.filter(i=>i.team===team&&!isDone(i));return `<article class="team-panel"><span class="team-avatar">${icon("users")}</span><h2>${esc(shortTeam(team))}</h2><p>${team===COORDINATORS?"Маршрутизация инцидентов и привлечение профильных команд":"Ответственные за восстановление и исследование сервисов"}</p><div class="team-stats"><div><strong>${own.length}</strong><span>инцидентов</span></div><div><strong>${own.filter(GROUPS[0].test).length}</strong><span>критических</span></div><div><strong>${own.filter(isOverdue).length}</strong><span>просрочено</span></div></div><button data-team="${esc(team)}">Показать инциденты</button></article>`;}).join("")}</section>`;
+  return `<section class="teams-grid" aria-label="Команды назначения">${teams.map(team=>{const own=items.filter(i=>i.team===team&&!isDone(i));return `<article class="team-panel"><span class="team-avatar">${icon("users")}</span><h2>${esc(shortTeam(team))}</h2><p>${team===COORDINATORS?"Маршрутизация инцидентов и привлечение профильных команд":"Ответственные за восстановление и исследование сервисов"}</p><div class="team-stats"><div><strong>${own.length}</strong><span>инцидентов</span></div><div><strong>${own.filter(i=>isOpen(i)&&i.priority==='critical').length}</strong><span>критических</span></div><div><strong>${own.filter(isOverdue).length}</strong><span>просрочено</span></div></div><button data-team="${esc(team)}">Показать инциденты</button></article>`;}).join("")}</section>`;
 }
 function render(){
+  if(state.group&&!matching().length)state.group=null;
   const sim=presentation.datasetView==='mts-demo';
   $('#simulation-label').textContent=sim?'Симуляция МТС':'Исходная выгрузка';
   $('#simulation-copy').textContent=sim?'Вымышленные сбои телеком-сервисов. Исполнители, статусы, приоритеты и сроки — из учебной выгрузки.':'Показаны названия, статусы и назначения из текущей выгрузки в формате МТС.';
@@ -298,12 +382,14 @@ function render(){
   $("#page-title").textContent=state.view==='dashboard'&&presentation.screen==='wallboard'?'Вся смена на одном экране':titles[state.view][0];$("#page-subtitle").textContent=state.view==='dashboard'&&presentation.screen==='wallboard'?'Общий обзор для широкого монитора. Те же инциденты, команды и сроки.':titles[state.view][1];
   $$("[data-view]").forEach(b=>{if(b.classList.contains("nav-item")){b.classList.toggle("active",b.dataset.view===state.view);if(b.dataset.view===state.view)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current");}});
   $("#toolbar").hidden=state.view!=="dashboard";
-  $("#overdue-filter").setAttribute("aria-pressed",state.overdue);$("#mine-filter").setAttribute("aria-pressed",state.coordinator);
-  $("#reset-filters").hidden=!hasFilters();
+  $("#mine-filter").setAttribute("aria-pressed",state.coordinator);
+  $("#reset-filters").hidden=!hasFilters();$("#work-sla").value=presentation.bucket||"";$("#work-sort").value=state.sort;
+  $("#workstationView").dataset.layout=state.layout;
   const mobileToggle=$("#mobile-filters");
-  if(mobileToggle){const activeFilters=Number(state.product!=="all")+Number(state.overdue)+Number(state.coordinator)+Number(state.priority!=="all")+Number(Boolean(state.group));mobileToggle.innerHTML=icon("sliders")+`Фильтры${activeFilters?` (${activeFilters})`:""}`;}
-  $$("[data-layout]").forEach(b=>{b.classList.toggle("active",b.dataset.layout===state.layout);b.setAttribute("aria-pressed",b.dataset.layout===state.layout);});
+  if(mobileToggle){const activeFilters=Number(state.product!=="all")+Number(Boolean(presentation.bucket))+Number(Boolean(state.team))+Number(state.coordinator)+Number(state.priority!=="all")+Number(Boolean(state.group));mobileToggle.innerHTML=icon("sliders")+`Фильтры${activeFilters?` (${activeFilters})`:""}`;}
+  $$("button[data-layout]").forEach(b=>{b.classList.toggle("active",b.dataset.layout===state.layout);b.setAttribute("aria-pressed",b.dataset.layout===state.layout);});
   renderScreen();
+  operations.renderAlerts();
   $("#clock").title=`Последнее изменение: ${fmtTime(state.lastUpdate)} МСК`;
   $("#notification-dot").hidden=!state.unread;
   document.body.classList.toggle("compact",state.compact);
@@ -317,13 +403,25 @@ function updateTimers(){
   $$("[data-progress-id]").forEach(el=>{const i=items.find(i=>i.id===el.dataset.progressId);if(i){el.style.width=progress(i)+"%";el.className=deadlineClass(i);}});
   $("#clock").textContent=fmtTime(Date.now())+" МСК";
   const sig=items.filter(isOverdue).map(i=>i.id).join(',')+Math.floor(Date.now()/60000);
-  if(sig!==lastClockSignature){lastClockSignature=sig;renderTop();if(state.view==='dashboard'&&(state.overdue||presentation.bucket||presentation.screen==='wallboard'))renderScreen();}
+  if(sig!==lastClockSignature){
+    lastClockSignature=sig;
+    if(state.group&&!matching().length){render();return;}
+    renderTop();if(state.view==='dashboard'&&(state.overdue||presentation.bucket||presentation.screen==='wallboard'))renderScreen();
+  }
 }
 function drawerOverview(i){
   const closed=!isOpen(i),cls=isDone(i)?"resolved":i.status==="investigating"?"research":"";
   return `<section class="deadline-box ${cls}"><div class="deadline-caption">${icon(closed?"checkCircle":"timer")}${closed?"Состояние сервиса":isOverdue(i)?"Срок решения нарушен":"Осталось до срока решения"}</div><div class="deadline-big">${deadlineMarkup(i,"big")}</div><p>${closed?`Дата завершения / восстановления: ${fmtFullTime(i.resolvedAt)} МСК${i.status==="investigating"?" · продолжается исследование":""}`:`Дедлайн: ${fmtFullTime(i.dueAt)} МСК`}</p></section>
   <section class="details-grid"><div><div class="detail-label">Продукт</div><div class="detail-value">${esc(i.product)}</div></div><div><div class="detail-label">Возникновение</div><div class="detail-value">${fmtFullTime(i.createdAt)} МСК</div></div><div><div class="detail-label">Приоритет</div><div class="detail-value"><span class="priority-badge ${i.priority}">${PRIORITY[i.priority]}</span></div></div><div><div class="detail-label">Статус</div><div class="detail-value"><span class="status ${i.status}">${STATUS[i.status]}</span></div></div><div class="detail-wide"><div class="detail-label">Команда назначения</div><div class="detail-value full-team">${esc(i.team)}</div></div><div class="detail-wide"><div class="detail-label">Исполнитель</div><div class="detail-value"><span class="avatar-mini">${esc(initials(i.assignee))}</span>${esc(i.assignee)}</div></div></section>
   <section class="detail-description">${i.status==="investigating"?`<h3>Срок из выгрузки</h3><p>${i.dueAt===null?"Не указан":fmtFullTime(i.dueAt)+" МСК"}. Исследование не учитывается как активная просрочка восстановления.</p>`:""}<h3>Что произошло</h3><p>${esc(i.description)}</p>${i.service?`<h3>Затронутый сервис</h3><p>${esc(i.service)}</p>`:""}${i.scenario?`<h3>Сценарий использования</h3><p>${esc(i.scenario)}</p>`:""}${i.solution?`<h3>Решение из выгрузки</h3><p>${esc(i.solution)}</p>`:""}${i.needsFollowUp===true?`<h3>Оставшиеся действия</h3><p>Выгрузка указывает, что требуется устранить последствия инцидента.</p>`:""}</section><section class="inline-ai"><h3>${icon("sparkle")}Кратко о ситуации</h3><p>${esc(isDone(i)?"Инцидент завершён. Решение и дата завершения показаны, если они есть в выгрузке.":i.summary)}</p><p class="ai-disclaimer">Краткое описание из карточки инцидента</p><button class="text-button" data-drawer-tab="ai">Рекомендация команды и факторы внимания</button></section>`;
+}
+function incidentEvidenceMarkup(i){
+  const evidence=operationalEvidence(i,items);
+  const links=(title,rows,empty)=>`<div><h4>${title}</h4>${rows.length?`<ul>${rows.map(row=>`<li><button class="text-button" data-open="${esc(row.id)}">${esc(row.id)} · ${esc(row.title)}</button><small>${esc(row.basis.join(' · '))}</small></li>`).join('')}</ul>`:`<p>${empty}</p>`}</div>`;
+  return `<section class="workflow-detail incident-evidence"><h3>Связи, сходство и назначения</h3>
+    ${links('Подтверждённые связи',evidence.confirmed,'Связанных ID среди карточек нет.')}
+    ${links('Похожие инциденты',evidence.similarities,'Похожих записей по текущим полям не найдено.')}
+    <h4>Аномалии назначения</h4>${evidence.assignment.length?`<ul>${evidence.assignment.map(row=>`<li><strong>${esc(row.label)}</strong><small>${esc(row.evidence)} ${(row.ids||[]).map(id=>`<button class="text-button" data-open="${esc(id)}">${esc(id)}</button>`).join(' ')}</small></li>`).join('')}</ul>`:'<p>По имеющимся данным отклонения не выявлены.</p>'}</section>`;
 }
 function drawerAI(i){
   const factors=[];
@@ -334,11 +432,11 @@ function drawerAI(i){
   if(i.status==="investigating")factors.push("Сервис уже восстановлен. Сейчас требуется разбор причин, а не повторное восстановление.");
   if(isDone(i))factors.push("Инцидент находится в завершённом статусе.");
   if(!factors.length)factors.push("Команда назначена; следует отслеживать статус и оставшееся время.");
-  return `<section class="inline-ai" style="margin-top:0"><h3>${icon("sparkle")}Сводка для координатора</h3><p>${esc(isDone(i)?"Инцидент завершён. Проверьте решение и признак необходимости устранения последствий в карточке.":i.summary)}</p><p class="ai-disclaimer">Разбор по правилам · без языковой модели</p></section><button class="button chat-incident-button" data-chat-open data-chat-context="${esc(i.id)}">${icon("sparkle")}Спросить об этом инциденте</button><div class="ai-section-label">Рекомендуемая команда</div><section class="recommendation"><strong>${esc(i.recommendation||"Владелец продукта не указан")}</strong><p>${i.recommendation?"Рекомендация демонстрационного сценария. Передачу подтверждает координатор в ITSM.":`Сейчас назначено: «${esc(shortTeam(i.team))}». Для предложения другой команды нужен справочник владельцев продукта «${esc(i.product)}».`}</p></section><div class="ai-section-label">Почему стоит обратить внимание</div><ul class="risk-factors">${factors.map(f=>`<li>${esc(f)}</li>`).join("")}</ul><p class="source-note">Подсказки опираются на текущие данные. Если сведений недостаточно, уточните их у ответственной команды. В чате можно задать свой вопрос.</p>`;
+  return `<section class="inline-ai" style="margin-top:0"><h3>${icon("sparkle")}Сводка для координатора</h3><p>${esc(isDone(i)?"Инцидент завершён. Проверьте решение и признак необходимости устранения последствий в карточке.":i.summary)}</p><p class="ai-disclaimer">Разбор по правилам · на основе данных карточки</p></section>${incidentEvidenceMarkup(i)}<button class="button chat-incident-button" data-chat-open data-chat-context="${esc(i.id)}">${icon("sparkle")}Спросить об этом инциденте</button><div class="ai-section-label">Рекомендуемая команда</div><section class="recommendation"><strong>${esc(i.recommendation||"Владелец продукта не указан")}</strong><p>${i.recommendation?"Рекомендация демонстрационного сценария. Аналитик подтверждает передачу через SimpleOne.":`Сейчас назначено: «${esc(shortTeam(i.team))}». Для предложения другой команды нужен справочник владельцев продукта «${esc(i.product)}».`}</p></section><div class="ai-section-label">Почему стоит обратить внимание</div><ul class="risk-factors">${factors.map(f=>`<li>${esc(f)}</li>`).join("")}</ul><p class="source-note">Подсказки опираются на текущие данные. Основания и ссылки доступны прямо в карточке. В чате можно задать свой вопрос.</p>`;
 }
 function drawerHistory(i){
   const cache=cardHistory.get(i.id),observed=cache?.events||events.filter(e=>e.incidentId===i.id);
-  const records=[...new Map([...i.history,...observed].map(e=>[e.id||[e.at,e.title,e.detail].join('|'),e])).values()].sort((a,b)=>b.at-a.at);
+  const records=[...new Map([...i.history,...(i.workHistory||[]),...observed].map(e=>[e.id||[e.at,e.title,e.detail].join('|'),e])).values()].sort((a,b)=>b.at-a.at);
   return `<div class="timeline">${records.map(e=>`<div class="timeline-item"><strong>${esc(e.title)}</strong><p>${esc(e.detail)}</p>${(e.changes||[]).map(c=>`<div class="history-diff"><span>${esc(c.label)}</span><p>Было: ${esc(c.before)}<br>Стало: ${esc(c.after)}</p></div>`).join('')}<time>${fmtFullTime(e.at)} МСК${e.actor?' · '+esc(e.actor):''}</time></div>`).join('')}</div>${cache?.loading?'<p class="history-status">Загружаю историю…</p>':''}${cache?.error?`<p class="history-status">${esc(cache.error)}</p>`:''}${cache?.hasMore?`<button class="button button-secondary" data-card-history-more="${esc(i.id)}">Показать более ранние события</button>`:''}`;
 }
 async function loadCardHistory(id,more=false){
@@ -351,7 +449,10 @@ async function loadCardHistory(id,more=false){
 }
 function safeItsmUrl(value){try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password?url.href:null;}catch{return null;}}
 function simpleOneLink(item,className){
+  const url=!sourceData.frozen&&!item.isSimulated&&safeItsmUrl(item.itsmUrl);
+  if(url)return `<a class="${className}" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Открыть в ITSM</a>`;
   const query=new URLSearchParams({incident:item.id,dataset:presentation.datasetView});
+  if(operations.isGuest())query.set("guest","1");
   return `<a class="${className}" data-simpleone="${esc(item.id)}" href="/itsm-demo?${esc(query.toString())}" target="_blank" rel="noopener noreferrer">Открыть в SimpleOne · демо</a>`;
 }
 function passLocalIncident(event){
@@ -377,8 +478,7 @@ document.addEventListener('click',passLocalIncident);
 document.addEventListener('auxclick',event=>{if(event.button===1)passLocalIncident(event);});
 function renderDrawer(){
   const i=items.find(i=>i.id===state.selected);if(!i){closeDrawer();return;}
-  const liveItsm=!sourceData.frozen&&!i.isSimulated?safeItsmUrl(i.itsmUrl):null;
-  $("#drawer").innerHTML=`<header class="drawer-header"><div class="drawer-id-row"><div class="drawer-id">${esc(i.id)}<button class="copy-button icon-button" data-copy="${esc(i.id)}" aria-label="Скопировать ID">${icon("copy")}</button></div><button class="icon-button" id="close-drawer" aria-label="Закрыть карточку">${icon("close")}</button></div><h2 id="drawer-title">${esc(i.title)}</h2><div class="drawer-badges">${groupsFor(i).map(g=>`<span class="group-badge ${g.key}">${g.title}</span>`).join("")}${isDone(i)?'<span class="group-badge" style="background:#edf7f0;color:#5a8f6a">Решён</span>':""}</div><nav class="drawer-tabs" aria-label="Разделы карточки">${[["overview","Инцидент"],["history","История"],["ai","ИИ-помощник"]].map(([key,label])=>`<button class="${state.drawerTab===key?"active":""}" data-drawer-tab="${key}" aria-pressed="${state.drawerTab===key}">${label}</button>`).join("")}</nav></header><div class="drawer-body">${state.drawerTab==="overview"?drawerOverview(i):state.drawerTab==="ai"?drawerAI(i):drawerHistory(i)}</div><footer class="drawer-footer"><button class="button button-secondary" data-copy="${i.id}">${icon("copy")}Скопировать ID</button>${simpleOneLink(i,'button button-primary')}${liveItsm?`<a class="button button-secondary" href="${esc(liveItsm)}" target="_blank" rel="noopener noreferrer">Открыть в ITSM</a>`:''}</footer>`;
+  $("#drawer").innerHTML=`<header class="drawer-header"><div class="drawer-id-row"><div class="drawer-id">${esc(i.id)}<button class="copy-button icon-button" data-copy="${esc(i.id)}" aria-label="Скопировать ID">${icon("copy")}</button></div><button class="icon-button" id="close-drawer" aria-label="Закрыть карточку">${icon("close")}</button></div><h2 id="drawer-title">${esc(i.title)}</h2><div class="drawer-badges">${groupsFor(i).map(g=>`<span class="group-badge ${g.key}">${g.title}</span>`).join("")}${isDone(i)?'<span class="group-badge" style="background:#edf7f0;color:#5a8f6a">Решён</span>':""}</div><nav class="drawer-tabs" aria-label="Разделы карточки">${[["overview","Инцидент"],["history","История"],["ai","ИИ-помощник"]].map(([key,label])=>`<button class="${state.drawerTab===key?"active":""}" data-drawer-tab="${key}" aria-pressed="${state.drawerTab===key}">${label}</button>`).join("")}</nav></header><div class="drawer-body">${state.drawerTab==="overview"?operations.details(i,{showPrecedents:true})+drawerOverview(i):state.drawerTab==="ai"?drawerAI(i):drawerHistory(i)}</div><footer class="drawer-footer"><button class="button button-secondary" data-copy="${i.id}">${icon("copy")}Скопировать ID</button>${simpleOneLink(i,'button button-primary')}</footer>`;
 }
 function openIncident(id,tab="overview"){
   if(!items.some(x=>x.id===id))return;
@@ -389,33 +489,42 @@ function openIncident(id,tab="overview"){
   renderDrawer();if(tab==="history")loadCardHistory(id);$("#close-drawer").focus();
 }
 function closeDrawer(){state.selected=null;$("#drawer-backdrop").hidden=true;$("#drawer").hidden=true;document.body.style.overflow="";if(lastFocus?.isConnected)lastFocus.focus();else $(".nav-item.active").focus();}
-function renderNotifications(){$("#notification-popover").innerHTML=`<h2>Уведомления</h2><p>${sourceData.frozen?"Локальная демонстрация":"Изменения полученной выгрузки"}</p>${events.slice(0,5).map(e=>eventMarkup(e)).join("")}`;}
+function renderNotifications(){const events=visibleEvents();$("#notification-popover").innerHTML=`<h2>Уведомления</h2><p>${sourceData.frozen?"Локальная демонстрация":"Изменения полученной выгрузки"}</p>${events.slice(0,5).map(e=>eventMarkup(e)).join("")}`;}
 function toast(title,detail,type="critical"){
   const el=document.createElement("div");el.className=`toast ${type}`;el.innerHTML=`${icon(type==="success"?"checkCircle":"alert")}<div class="toast-copy"><strong>${esc(title)}</strong><p>${esc(detail)}</p></div><button class="icon-button" aria-label="Закрыть уведомление">${icon("close")}</button>`;el.querySelector("button").addEventListener("click",()=>el.remove());$("#toast-region").append(el);while($("#toast-region").children.length>3)$("#toast-region").firstElementChild.remove();setTimeout(()=>el.remove(),7500);
 }
 function addEvent(item,type,title,detail){const now=Date.now();events.unshift({id:now+Math.random(),incidentId:item.id,type,title,detail,at:now});item.history.push({title,detail,at:now});state.lastUpdate=now;state.unread=true;refreshProducts();render();toast(title,`${item.id} · ${detail}`,type);}
 function scenariosMenu(){return `<div class="menu-title">ДЕМОНСТРАЦИЯ ИЗМЕНЕНИЙ</div><button data-scenario="critical">${icon("alert")}Новый критический инцидент</button><button data-scenario="coord">${icon("users")}Назначить координаторам</button><button data-scenario="deadline">${icon("timer")}Изменить срок решения</button><button data-scenario="resolve">${icon("checkCircle")}Решить критический инцидент</button><div class="menu-separator"></div><button data-scenario="compact" class="muted-action">${icon("list")}${state.compact?"Обычный":"Компактный"} вид</button><button data-scenario="reset" class="muted-action">${icon("refresh")}Начать заново</button>`;}
 function runScenario(type){
-  if(type!=="compact"&&type!=="reset"){sourceData.frozen=true;renderDataStatus();}
+  if(type!=="compact"&&type!=="reset"&&!(operations.isGuest()&&type==="critical")){sourceData.frozen=true;renderDataStatus();}
   $("#scenario-menu").hidden=true;$("#scenarios-button").setAttribute("aria-expanded","false");
   if(type==="critical"){
-    const now=Date.now();const id=`INC-${state.nextId++}`;
+    const now=Date.now(),id=`INC-${now}${String(Math.floor(Math.random()*1000)).padStart(3,"0")}`;
     const i={id,title:"Недоступна оплата мобильной связи",product:"Мой МТС",priority:"critical",status:"assigned",team:COORDINATORS,assignee:"Мария Орлова",createdAt:now,dueAt:now+15*60000,isNew:true,description:"Новый демонстрационный инцидент: при пополнении счёта возникает ошибка. Событие добавлено для проверки реакции дашборда.",summary:"Нарушена оплата мобильной связи. Инцидент критический и поступил координаторам; необходимо подключить платёжную команду.",recommendation:"Платёжная платформа",history:[{title:"Инцидент зарегистрирован",detail:"Приоритет: критический",at:now}]};
-    items.unshift(i);addEvent(i,"critical","Новый критический инцидент","Мой МТС · требуется реакция координатора");
+    if(operations.isGuest()){i.guestDemo=true;i.sysId="demo:"+id;operations.addDemo(i);}else baseItems.unshift(i);
+    rebuildItems();addEvent(i,"critical","Новый критический инцидент","Мой МТС · требуется реакция координатора");
   }else if(type==="coord"){
-    const i=items.find(i=>isOpen(i)&&i.team!==COORDINATORS&&i.priority!=="critical")||items.find(i=>isOpen(i)&&i.team!==COORDINATORS);
+    const i=baseItems.find(i=>isOpen(i)&&i.team!==COORDINATORS&&i.priority!=="critical")||baseItems.find(i=>isOpen(i)&&i.team!==COORDINATORS);
     if(!i){toast("Все активные инциденты уже у координаторов","Добавьте новое событие или начните демонстрацию заново.","success");return;}
-    i.team=COORDINATORS;i.assignee="Павел Ильин";i.status="assigned";addEvent(i,"coord","Назначен на координаторов",`${i.product} · требуется профильная команда`);
+    i.team=COORDINATORS;i.assignee="Павел Ильин";i.status="assigned";rebuildItems();addEvent(i,"coord","Назначен на координаторов",`${i.product} · требуется профильная команда`);
   }else if(type==="deadline"){
-    const i=items.find(i=>isOpen(i)&&i.priority==="high"&&!isOverdue(i))||items.find(isOpen);
+    const i=baseItems.find(i=>isOpen(i)&&i.priority==="high"&&!isOverdue(i))||baseItems.find(isOpen);
     if(!i){toast("Нет активных инцидентов","Начните демонстрацию заново.","success");return;}
-    i.dueAt=Date.now()+2*60000;addEvent(i,"changed","Срок решения изменён",`${i.product} · осталось 2 минуты`);
+    i.dueAt=Date.now()+2*60000;rebuildItems();addEvent(i,"changed","Срок решения изменён",`${i.product} · осталось 2 минуты`);
   }else if(type==="resolve"){
-    const i=items.find(i=>isOpen(i)&&i.priority==="critical");
-    if(!i){toast("Критических инцидентов нет","Все критические сервисы восстановлены.","success");return;}
-    i.status="resolved";i.resolvedAt=Date.now();i.isNew=false;addEvent(i,"success","Критический инцидент решён",`${i.product} · работа сервиса восстановлена`);
+    const rows=operations.book(),critical=items.filter(i=>isOpen(i)&&i.priority==="critical");
+    const i=critical.find(item=>!operations.pending(item,rows));
+    if(!i){
+      if(critical.length)toast("Инцидент ждёт аналитика","Передайте инцидент исполнительной команде через SimpleOne.","changed");
+      else toast("Критических инцидентов нет","Все критические сервисы восстановлены.","success");
+      return;
+    }
+    const entry=i.guestDemo?{...i}:baseItems.find(item=>item.id===i.id)||i;
+    Object.assign(entry,{status:"resolved",resolvedAt:Date.now(),isNew:false,solution:"Демосценарий подтвердил восстановление сервиса."});
+    if(i.guestDemo){operations.addDemo(entry);refreshOperations(true);return;}
+    rebuildItems();addEvent(entry,"success","Критический инцидент решён",`${i.product} · работа сервиса восстановлена`);
   }else if(type==="compact"){state.compact=!state.compact;render();}
-  else if(type==="reset"){loadIncidents(true);}
+  else if(type==="reset"){if(operations.isGuest())operations.clearDemo();loadIncidents(true);}
 }
 function updateDemoButton(){$("#demo-button").innerHTML=`${icon(state.demoRunning?"pause":"play")}<span>${state.demoRunning?"Остановить демо":"Запустить демо"}</span>`;}
 function stopDemo(){clearInterval(state.demoTimer);state.demoTimer=null;state.demoRunning=false;updateDemoButton();}
@@ -425,49 +534,64 @@ function startDemo(){
   runScenario(steps[state.demoStep++]);
   state.demoTimer=setInterval(()=>{runScenario(steps[state.demoStep++]);if(state.demoStep>=steps.length){stopDemo();}},6500);
 }
-function resetFilters(){presentation.bucket=null;presentation.scope='focus';state.showAll=false;state.search="";state.product="all";state.overdue=false;state.coordinator=false;state.priority="all";state.group=null;$("#search").value="";$("#product-filter").value="all";}
+function resetFilters(){presentation.bucket=null;presentation.scope='focus';state.team=null;state.search="";state.product="all";state.overdue=false;state.coordinator=false;state.priority="all";state.group=null;$("#search").value="";$("#product-filter").value="all";}
+function selectDnaIncident(id){
+  if(!items.some(item=>item.id===id))return;
+  presentation.spotlight=id;
+  renderTop();
+}
 async function copyId(id){try{await navigator.clipboard.writeText(id);toast("ID скопирован",id,"success");}catch{const temp=document.createElement("textarea");temp.value=id;temp.setAttribute("readonly","");temp.style.position="fixed";temp.style.opacity="0";document.body.append(temp);temp.select();const ok=document.execCommand("copy");temp.remove();toast(ok?"ID скопирован":"ID инцидента",id,"success");}}
 
 document.addEventListener("click",event=>{
+  if(event.target.closest("a[href]"))return;
   const target=event.target.closest("button, [data-open], [data-preview]");
   if(target?.id==='dataset-view-toggle'){if(sourceData.busy)return;presentation.datasetView=presentation.datasetView==='mts-demo'?'source':'mts-demo';stopDemo();sourceData.frozen=false;loadIncidents(true);return;}
   if(target?.dataset.preview){presentation.spotlight=target.dataset.preview;renderReference(ctrlContext());return;}
   if(target?.hasAttribute('data-clear-sla')){presentation.bucket=null;render();return;}
   if(target?.hasAttribute('data-reset-reference')){resetFilters();render();return;}
-  if(target?.hasAttribute('data-ticker-toggle')){const paused=document.documentElement.dataset.tickerPaused!=='true';document.documentElement.dataset.tickerPaused=paused;target.setAttribute('aria-pressed',paused);target.querySelector('#marqueeToggleLabel').textContent=paused?'Продолжить':'Пауза';return;}
-  if(target?.dataset.pin){const id=target.dataset.pin;presentation.pins=presentation.pins.includes(id)?presentation.pins.filter(x=>x!==id):[...presentation.pins,id];try{localStorage.setItem('mts-ctrl-pins',JSON.stringify(presentation.pins));}catch{}render();return;}
-  if(target?.dataset.slaSelect){const key=target.dataset.slaSelect;if(target.dataset.heatProduct){state.product=target.dataset.heatProduct;$('#product-filter').value=state.product;presentation.screen='workstation';}presentation.bucket=presentation.bucket===key&&!target.dataset.heatProduct?null:key;presentation.scope='active';state.showAll=false;state.view='dashboard';state.layout='queue';render();return;}
-  if(target?.hasAttribute('data-product-all')){state.product='all';$('#product-filter').value='all';render();return;}
-  if(target?.dataset.focusGroup){const group=target.dataset.focusGroup,selected=state.group===group;resetFilters();state.group=selected?null:group;state.layout='queue';state.view='dashboard';presentation.screen='workstation';render();return;}
-  if(target?.dataset.queueScope){const scope=target.dataset.queueScope;resetFilters();presentation.scope=scope;state.showAll=scope==='finished';state.layout='queue';state.view='dashboard';presentation.screen='workstation';render();return;}
-  if(target?.dataset.chartInterval){presentation.interval=Number(target.dataset.chartInterval);render();return;}
-  if(target?.dataset.chartDonut){presentation.donut=target.dataset.chartDonut;render();return;}
-  if(target?.hasAttribute('data-chart-teams')){presentation.showTeams=!presentation.showTeams;render();return;}
+  if(target?.dataset.focusGroup){
+    const group=target.dataset.focusGroup;
+    state.group=state.group===group?null:group;
+    render();
+    $(`[data-focus-group="${group}"]`)?.focus({preventScroll:true});
+    return;
+  }
+  if(target?.dataset.dnaIncident){
+    $('#dna-search').value='';$('#dna-category').value='all';
+    selectDnaIncident(target.dataset.dnaIncident);
+    $('#incident-dna').scrollIntoView({block:'nearest'});
+    $("#dna-incident-picker").focus({preventScroll:true});
+    return;
+  }
+  if(target?.dataset.queueScope){state.group=null;presentation.scope=target.dataset.queueScope;state.view='dashboard';presentation.screen='workstation';render();return;}
   if(target?.hasAttribute('data-fullscreen')){if(!document.fullscreenElement)document.documentElement.requestFullscreen?.().catch(()=>{});else document.exitFullscreen?.();return;}
-  if(target?.dataset.screenMode){presentation.screen=target.dataset.screenMode;state.view='dashboard';render();return;}
+  if(target?.dataset.screenMode){presentation.screen=target.dataset.screenMode;state.view='dashboard';if(presentation.screen==='workstation'&&document.fullscreenElement)document.exitFullscreen?.();refreshOperations(true);return;}
   if(target?.dataset.themeMode){const theme=target.dataset.themeMode==='night'?'night':'day';document.documentElement.dataset.theme=theme;try{localStorage.setItem('mts-ctrl-theme',theme);}catch{}syncPresentation();document.querySelector('meta[name="theme-color"]').content=theme==='night'?'#0b0e14':'#f2f3f7';return;}
   if(target?.dataset.product){state.product=state.product===target.dataset.product?'all':target.dataset.product;$('#product-filter').value=state.product;render();return;}
   if(target?.hasAttribute("data-import-open")){openImportDialog();return;}
   if(target?.hasAttribute("data-history-more")){loadMoreHistory(target);return;}
   if(target?.dataset.cardHistoryMore){loadCardHistory(target.dataset.cardHistoryMore,true);return;}
   if(target?.hasAttribute("data-reload-incidents")){loadIncidents(true);return;}
-  if(target?.hasAttribute("data-all-incidents")){presentation.screen='workstation';resetFilters();presentation.scope='all';state.showAll=true;state.layout="table";state.view="dashboard";render();return;}
+  if(target?.hasAttribute("data-all-incidents")){presentation.screen='workstation';resetFilters();presentation.scope='all';state.view="dashboard";render();return;}
   if(target?.dataset.open){openIncident(target.dataset.open,target.dataset.initialTab||"overview");return;}
   if(target?.dataset.view){presentation.screen='workstation';state.view=target.dataset.view;render();window.scrollTo({top:0,behavior:"smooth"});}
-  if(target?.dataset.layout){state.layout=target.dataset.layout;state.showAll=false;render();}
+  if(target?.matches('button[data-layout]')){state.layout=target.dataset.layout;render();}
   if(target?.dataset.scenario)runScenario(target.dataset.scenario);
   if(target?.dataset.drawerTab){state.drawerTab=target.dataset.drawerTab;renderDrawer();if(state.drawerTab==="history")loadCardHistory(state.selected);$(`#drawer [data-drawer-tab="${state.drawerTab}"]`).focus();}
   if(target?.dataset.copy)copyId(target.dataset.copy);
-  if(target?.dataset.team){resetFilters();state.search=target.dataset.team;$("#search").value=state.search;state.view="dashboard";state.layout="table";render();window.scrollTo({top:0,behavior:"smooth"});}
-  if(target?.dataset.metric){presentation.bucket=null;presentation.scope=target.dataset.metric==='all'?'active':'focus';presentation.screen='workstation';state.showAll=false;state.layout="table";const key=target.dataset.metric,was=key==="critical"?state.priority==="critical":key==="overdue"?state.overdue:key==="coord"?state.coordinator:false;state.overdue=false;state.coordinator=false;state.priority="all";state.group=null;if(!was){if(key==="critical")state.priority="critical";if(key==="overdue")state.overdue=true;if(key==="coord")state.coordinator=true;}render();}
-  if(target?.dataset.group){presentation.screen='workstation';const group=target.dataset.group;resetFilters();state.group=group;state.layout="table";$("#toolbar").classList.add("filters-open");$("#mobile-filters").setAttribute("aria-expanded","true");render();}
+  if(target?.dataset.team){resetFilters();state.team=target.dataset.team;presentation.scope=target.hasAttribute('data-active-team')?'active':'all';state.view="dashboard";state.layout="table";render();window.scrollTo({top:0,behavior:"smooth"});}
+  if(target?.dataset.metric){presentation.bucket=null;presentation.scope=target.dataset.metric==='all'?'active':'focus';presentation.screen='workstation';state.layout="table";const key=target.dataset.metric,was=key==="critical"?state.priority==="critical":key==="overdue"?state.overdue:key==="coord"?state.coordinator:false;state.overdue=false;state.coordinator=false;state.priority="all";state.group=null;if(!was){if(key==="critical")state.priority="critical";if(key==="overdue")state.overdue=true;if(key==="coord")state.coordinator=true;}render();}
   if(target?.id==="close-drawer")closeDrawer();
   if(!event.target.closest(".scenario-anchor")){$("#scenario-menu").hidden=true;$("#scenarios-button").setAttribute("aria-expanded","false");}
   if(!event.target.closest("#notification-popover")&&!event.target.closest("#notification-button")){$("#notification-popover").hidden=true;$("#notification-button").setAttribute("aria-expanded","false");}
 });
 $("#search").addEventListener("input",e=>{state.search=e.target.value;render();});
+$("#work-sla").addEventListener("change",event=>{presentation.bucket=event.target.value||null;render();});
+$("#work-sort").addEventListener("change",event=>{state.sort=event.target.value;render();});
+$("#dna-search").addEventListener("input",()=>operations.renderDna());
+$("#dna-category").addEventListener("change",()=>operations.renderDna());
+$("#dna-incident-picker").addEventListener("change",event=>selectDnaIncident(event.target.value));
 $("#product-filter").addEventListener("change",e=>{state.product=e.target.value;render();});
-$("#overdue-filter").addEventListener("click",()=>{state.overdue=!state.overdue;render();});
 $("#mine-filter").addEventListener("click",()=>{state.coordinator=!state.coordinator;render();});
 $("#reset-filters").addEventListener("click",()=>{resetFilters();render();});
 $("#scenarios-button").addEventListener("click",()=>{const menu=$("#scenario-menu");menu.innerHTML=scenariosMenu();menu.hidden=!menu.hidden;$("#scenarios-button").setAttribute("aria-expanded",!menu.hidden);});
@@ -476,6 +600,7 @@ $("#notification-button").addEventListener("click",()=>{const p=$("#notification
 $("#drawer-backdrop").addEventListener("click",closeDrawer);
 $("#about-button").addEventListener("click",()=>$("#about-dialog").showModal());
 document.addEventListener("keydown",e=>{
+  if($("#workflow-dialog").open)return;
   if(!$("#assistant-panel").hidden){
     if(e.key==="Escape"){e.preventDefault();closeAssistant();return;}
     if(e.key==="Tab"){const focusable=$$("#assistant-panel button:not([disabled]),#assistant-panel textarea:not([disabled]),#assistant-panel a[href]");const first=focusable[0],last=focusable.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}
@@ -490,10 +615,11 @@ document.addEventListener("keydown",e=>{
     const focusable=$$("#drawer button:not([disabled]),#drawer a[href]");const first=focusable[0],last=focusable.at(-1);
     if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
   }
-  if(e.key==="/"&&!state.selected&&state.view==="dashboard"&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){e.preventDefault();$("#search").focus();}
+  if(e.key==="/"&&!state.selected&&state.view==="dashboard"&&presentation.screen==="workstation"&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){e.preventDefault();$("#search").focus();}
   if((e.key==="Enter"||e.key===" ")&&e.target.matches("[data-preview]")){e.preventDefault();presentation.spotlight=e.target.dataset.preview;renderReference(ctrlContext());}
   if((e.key==="Enter"||e.key===" ")&&e.target.matches("tr[data-open]")){e.preventDefault();openIncident(e.target.dataset.open);}
 });
+window.addEventListener("resize",()=>{if(presentation.screen==="wallboard")renderScreen();});
 window.addEventListener("pagehide",()=>clearInterval(state.demoTimer));
 
 function assistantRequestContext(){return sourceData.frozen?{contextMode:'client_demo',snapshot:assistantSnapshot()}:{contextMode:'server',context:{view:presentation.datasetView,selectedId:assistant.contextId}};}
@@ -506,15 +632,16 @@ function assistantMessageMarkup(message){
   const refs=(message.references||[]).filter(id=>known.has(id));
   return `<article class="assistant-message ${message.error?'error':''}"><div class="assistant-message-label">${icon("sparkle")}${message.welcome?'Помощник координатора':message.mode==='llm'?'Фокус AI':message.error?'Не удалось получить ответ':'Демо-анализ'}${message.model?`<span>${esc(message.model)}</span>`:''}</div>${message.warning?`<div class="assistant-warning">${esc(message.warning)}</div>`:''}<div class="assistant-message-body">${content}</div>${refs.length?`<div class="assistant-references">${refs.map(id=>`<button data-chat-reference="${esc(id)}">${esc(id)}${icon("external")}</button>`).join('')}</div>`:''}${message.context?`<div class="assistant-data-proof">${message.context.mode==='client_demo'?'Локальная симуляция этой вкладки':`Данные сервера${message.context.version?' · версия '+message.context.version:''} · всего ${message.context.total}`}${message.context.stale?' · сохранённый снимок':''}</div>`:''}${message.at?`<time>${fmtTime(message.at)} МСК · ${message.mode==='llm'?'языковая модель':'анализ снимка'}</time>`:''}</article>`;
 }
+function assistantCanAsk(){return !auth.checking&&(Boolean(auth.user)||operations.isGuest());}
 function renderAssistantMessages(){
   const box=$("#assistant-messages");if(!box)return;
   box.innerHTML=assistant.messages.map(assistantMessageMarkup).join('')+(assistant.pending?`<div class="assistant-working" role="status">${icon("sparkle")}Анализирую текущие инциденты…</div>`:'');
   box.scrollTop=box.scrollHeight;
   $("#assistant-new-chat").disabled=assistant.pending;
-  $$("[data-chat-preset]").forEach(b=>b.disabled=assistant.pending||!auth.user||auth.checking);
+  $$("[data-chat-preset]").forEach(b=>b.disabled=assistant.pending||!assistantCanAsk());
   updateAssistantSendButton();
 }
-function updateAssistantSendButton(){const input=$("#assistant-input"),button=$("#assistant-send");if(!input||!button)return;button.disabled=assistant.pending||!input.value.trim()||!auth.user||auth.checking;$("#assistant-counter").textContent=`${input.value.length}/2000`;}
+function updateAssistantSendButton(){const input=$("#assistant-input"),button=$("#assistant-send");if(!input||!button)return;button.disabled=assistant.pending||!input.value.trim()||!assistantCanAsk();$("#assistant-counter").textContent=`${input.value.length}/2000`;}
 function renderAssistantStatus(){
   const badge=$("#assistant-mode"),notice=$("#assistant-mode-note");if(!badge||!notice)return;
   const config=assistant.configuration;
@@ -524,6 +651,7 @@ function renderAssistantStatus(){
 }
 async function checkAssistantConnection(){
   const check=$("#assistant-check");if(check)check.disabled=true;
+  if(operations.isGuest()){assistant.configuration={available:false,label:'Гостевой анализ',message:'Ответы по правилам и текущим карточкам этого браузера.'};renderAssistantStatus();if(check)check.disabled=false;return;}
   try{const response=await fetch('/api/assistant/status',{cache:'no-store',signal:AbortSignal.timeout(7000)});if(!response.ok)throw new Error();const data=await response.json();assistant.configuration={available:data.available===true,label:data.label,message:data.message};}
   catch{assistant.configuration={available:false,label:'Сервис недоступен',message:'Не удалось проверить подключение. Проверьте интернет и нажмите кнопку обновления рядом с режимом.'};}
   finally{renderAssistantStatus();if($("#assistant-check"))$("#assistant-check").disabled=false;}
@@ -534,8 +662,8 @@ function openAssistant(contextId=null){
   if(state.selected)closeDrawer();
   $("#scenario-menu").hidden=true;$("#notification-popover").hidden=true;
   $("#assistant-backdrop").hidden=false;$("#assistant-panel").hidden=false;document.body.style.overflow='hidden';
-  $("#assistant-panel").innerHTML=`<header class="assistant-header"><div class="assistant-heading"><span class="assistant-avatar">${icon("sparkle")}</span><div><h2 id="assistant-title">Фокус AI</h2><p>Вопросы по инцидентам на дашборде</p></div><button class="icon-button" id="assistant-close" aria-label="Закрыть чат">${icon("close")}</button></div><div class="assistant-state-row"><span id="assistant-mode" class="assistant-mode"></span><button class="icon-button" id="assistant-check" aria-label="Проверить ответ помощника" title="Проверить ответ помощника">${icon("refresh")}</button><button class="assistant-new-chat" id="assistant-new-chat">Новый диалог</button></div><p class="assistant-mode-note" id="assistant-mode-note"></p><a class="assistant-setup-link" href="/guide.html#yandex" target="_top">Как работает помощник</a><div class="assistant-context" id="assistant-context"></div></header><div class="assistant-messages" id="assistant-messages" aria-live="polite" aria-relevant="additions text" aria-label="История диалога"></div><div class="assistant-presets"><button data-chat-preset="Что сейчас самое срочное?">Что самое срочное?</button><button data-chat-preset="Какие инциденты просрочены?">Что просрочено?</button><button data-chat-preset="${assistant.contextId?`Кому передать ${esc(assistant.contextId)}?`:'Сводка по всем инцидентам'}">${assistant.contextId?'Кому передать?':'Краткая сводка'}</button></div><form class="assistant-form" id="assistant-form"><label for="assistant-input" class="sr-only">Вопрос помощнику</label><textarea id="assistant-input" rows="2" maxlength="2000" placeholder="Например: кто решает INC000021931151?"></textarea><div class="assistant-form-bottom"><span><span id="assistant-counter">0/2000</span><span class="assistant-keyboard-hint"> · Enter — отправить</span></span><button class="button button-primary" id="assistant-send" type="submit" disabled>Отправить${icon("sparkle")}</button></div></form><div class="assistant-footer-note">Выгрузка хакатона. Ответы могут содержать ошибки — сверяйте с карточкой.</div>`;
-  if(!assistant.messages.length)assistant.messages.push({role:'assistant',welcome:true,content:'Привет! Можно спросить о приоритетах, сроках и командах. В каждом вопросе использую свежий снимок инцидентов: после демособытия ответ изменится.'});
+  $("#assistant-panel").innerHTML=`<header class="assistant-header"><div class="assistant-heading"><span class="assistant-avatar">${icon("sparkle")}</span><div><h2 id="assistant-title">Фокус AI</h2><p>Вопросы по инцидентам на дашборде</p></div><button class="icon-button" id="assistant-close" aria-label="Закрыть чат">${icon("close")}</button></div><div class="assistant-state-row"><span id="assistant-mode" class="assistant-mode"></span><button class="icon-button" id="assistant-check" aria-label="Проверить ответ помощника" title="Проверить ответ помощника">${icon("refresh")}</button><button class="assistant-new-chat" id="assistant-new-chat">Новый диалог</button></div><p class="assistant-mode-note" id="assistant-mode-note"></p><a class="assistant-setup-link" href="/guide.html#yandex" target="_top">Как работает помощник</a><div class="assistant-context" id="assistant-context"></div></header><div class="assistant-messages" id="assistant-messages" aria-live="polite" aria-relevant="additions text" aria-label="История диалога"></div><div class="assistant-presets"><button data-chat-preset="Что сейчас самое срочное?">Что самое срочное?</button><button data-chat-preset="Какие инциденты просрочены?">Что просрочено?</button><button data-chat-preset="${assistant.contextId?`Кому передать ${esc(assistant.contextId)}?`:'Сводка по всем инцидентам'}">${assistant.contextId?'Кому передать?':'Краткая сводка'}</button><button data-chat-preset="Проверь связи, похожие случаи и аномалии назначения${assistant.contextId?" "+esc(assistant.contextId):""}">Связи и назначения</button></div><form class="assistant-form" id="assistant-form"><label for="assistant-input" class="sr-only">Вопрос помощнику</label><textarea id="assistant-input" rows="2" maxlength="2000" placeholder="Например: кто решает INC000021931151?"></textarea><div class="assistant-form-bottom"><span><span id="assistant-counter">0/2000</span><span class="assistant-keyboard-hint"> · Enter — отправить</span></span><button class="button button-primary" id="assistant-send" type="submit" disabled>Отправить${icon("sparkle")}</button></div></form><div class="assistant-footer-note">Выгрузка хакатона. Ответы могут содержать ошибки — сверяйте с карточкой.</div>`;
+  if(!assistant.messages.length)assistant.messages.push({role:'assistant',welcome:true,content:'Привет! Можно спросить о приоритетах, похожих инцидентах и аномалиях назначения. В каждом вопросе использую свежий снимок инцидентов: после демособытия ответ изменится.'});
   const gate=document.createElement('div');gate.id='assistant-auth-gate';gate.className='assistant-auth-gate';$(".assistant-presets").before(gate);
   refreshAssistantAuth();
   renderAssistantMessages();renderAssistantStatus();refreshAssistantContext();checkAssistantConnection();
@@ -547,10 +675,18 @@ function openAssistant(contextId=null){
 function closeAssistant(){$("#assistant-panel").hidden=true;$("#assistant-backdrop").hidden=true;document.body.style.overflow='';if(assistant.lastFocus?.isConnected&&!assistant.lastFocus.closest('[hidden]'))assistant.lastFocus.focus();else $("#assistant-launcher").focus();}
 async function submitAssistantQuestion(preset){
   if(assistant.pending)return;
-  if(!auth.user||auth.checking){refreshAssistantAuth();return;}
+  if(!assistantCanAsk()){refreshAssistantAuth();return;}
   const input=$("#assistant-input"),question=(typeof preset==='string'?preset:input.value).trim();if(!question||question.length>2000)return;
   const history=assistant.messages.filter(m=>!m.welcome&&!m.error).slice(-8).map(m=>({role:m.role,content:m.content}));
   const generation=assistant.generation;
+  if(operations.isGuest()){
+    const rows=operations.book(),snapshot={...assistantSnapshot(),incidents:items.map(item=>{
+      const assignment=operations.assignment(item,rows);return {...item,team:assignment.team,assignee:assignment.person};
+    })};
+    const answer=localAnswer(question,snapshot,history);
+    assistant.messages.push({role:'user',content:question},{role:'assistant',content:answer,mode:'local',references:selectReferences(answer,snapshot.incidents),context:{mode:'client_demo'},at:Date.now()});
+    input.value='';renderAssistantMessages();return;
+  }
   assistant.messages.push({role:'user',content:question});assistant.pending=true;input.value='';assistant.controller=new AbortController();
   renderAssistantMessages();
   const timeout=setTimeout(()=>assistant.controller?.abort(),65000);
@@ -586,28 +722,29 @@ async function logoutOwnAccount(){
 document.addEventListener('click',event=>{if(event.target.closest('[data-auth-logout]'))logoutOwnAccount();});
 function renderAccount(){
   const label=$("#account-label"),avatar=$("#account-avatar"),menu=$("#account-menu");
-  if(auth.user){const name=auth.user.displayName;label.textContent=name.includes('@')?name.split('@')[0]:name.split(' ')[0];avatar.textContent=initials(name).toLocaleUpperCase('ru');avatar.classList.add('signed-in');menu.innerHTML=`<div class="account-summary"><strong>${esc(name)}</strong><span>${esc(auth.user.username||auth.user.email||'')}</span><span class="account-role">${auth.user.role==='editor'?'Редактор данных':'Координатор'}</span></div><p>Вы можете задавать вопросы помощнику по текущим инцидентам.</p>${auth.canManageAccounts?'<a href="/account" target="_top" class="account-action">Доступ команды</a><a href="/ai-settings" target="_top" class="account-action">Подключение ИИ</a>':''}${auth.logoutMethod==='POST'?'<button type="button" data-auth-logout class="account-action">Выйти из Фокуса</button>':`<a href="${esc(auth.logoutUrl)}" target="_top" class="account-action">Выйти из Фокуса</a>`}`;}
-  else{label.textContent='Войти';avatar.textContent='Г';avatar.classList.remove('signed-in');menu.innerHTML=`<div class="account-summary"><strong>${auth.checking?'Проверяем вход…':'Гостевой просмотр'}</strong><span>Обзор и демосценарии доступны всем.</span></div><p>${auth.error?esc(auth.error):'Войдите в Фокус, чтобы задавать вопросы по текущим инцидентам.'}</p><a href="${esc(auth.loginUrl)}" target="_top" class="button button-primary">Войти в свой аккаунт</a>${auth.error?'<button id="account-retry" class="account-retry">Повторить проверку</button>':''}`;}
+  if(auth.user){const name=auth.user.displayName;label.textContent=name.includes('@')?name.split('@')[0]:name.split(' ')[0];avatar.textContent=initials(name).toLocaleUpperCase('ru');avatar.classList.add('signed-in');menu.innerHTML=`<div class="account-summary"><strong>${esc(name)}</strong><span>${esc(auth.user.username||auth.user.email||'')}</span><span class="account-role">${auth.user.role==='editor'?'Редактор данных':'Аналитик-координатор'}</span></div><p>Вы можете задавать вопросы помощнику по текущим инцидентам.</p>${auth.canManageAccounts?'<a href="/account" target="_top" class="account-action">Доступ команды</a><a href="/ai-settings" target="_top" class="account-action">Подключение ИИ</a>':''}${auth.logoutMethod==='POST'?'<button type="button" data-auth-logout class="account-action">Выйти из Фокуса</button>':`<a href="${esc(auth.logoutUrl)}" target="_top" class="account-action">Выйти из Фокуса</a>`}`;}
+  else{label.textContent=auth.checking?'Войти':'Гость';avatar.textContent='Г';avatar.classList.remove('signed-in');menu.innerHTML=`<div class="account-summary"><strong>${auth.checking?'Проверяем вход…':'Гостевой вход'}</strong><span>Учебные назначения и статусы сохраняются в этом браузере.</span></div>${auth.error?'<p>'+esc(auth.error)+'</p>':''}<a href="${esc(auth.loginUrl)}" target="_top" class="button button-primary">Войти в свой аккаунт</a>${auth.error?'<button id="account-retry" class="account-retry">Повторить проверку</button>':''}`;}
 }
 function refreshAssistantAuth(){
   const gate=$("#assistant-auth-gate"),input=$("#assistant-input");if(!gate||!input)return;
-  gate.hidden=Boolean(auth.user)&&!auth.checking;
+  const canAsk=assistantCanAsk();
+  gate.hidden=canAsk;
   gate.innerHTML=auth.checking?'<strong>Проверяем вход…</strong><p>Подождите несколько секунд.</p>':`<strong>${auth.error?'Не удалось проверить сеанс':'Войдите в Фокус'}</strong><p>После входа вы сможете задавать вопросы по текущим инцидентам.</p><a class="button button-primary" href="${esc(auth.assistantLoginUrl)}" target="_top">Войти и открыть чат</a>`;
-  input.disabled=!auth.user||auth.checking;input.placeholder=auth.user?'Например: кто решает INC000021931151?':'Войдите, чтобы отправить вопрос';
-  $$("[data-chat-preset]").forEach(b=>b.disabled=assistant.pending||!auth.user||auth.checking);
+  input.disabled=!canAsk;input.placeholder=canAsk?'Например: кто решает INC000021931151?':'Войдите, чтобы отправить вопрос';
+  $$("[data-chat-preset]").forEach(b=>b.disabled=assistant.pending||!canAsk);
   updateAssistantSendButton();
 }
 async function checkCurrentUser(){
   auth.checking=true;auth.error=null;renderAccount();refreshAssistantAuth();
-  try{const response=await fetch('/api/auth/me',{cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(7000)});if(!response.ok)throw new Error();const data=await response.json();auth.canImport=data.capabilities?.importIncidents===true;auth.canManageAccounts=data.capabilities?.manageAccounts===true;auth.logoutMethod=data.logoutMethod||'GET';auth.user=data.authenticated===true&&['coordinator','editor'].includes(data.user?.role)?data.user:null;auth.loginUrl=data.loginUrl;auth.assistantLoginUrl=data.assistantLoginUrl;auth.logoutUrl=data.logoutUrl;}
+  try{if(guestView)return;const response=await fetch('/api/auth/me',{cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(7000)});if(!response.ok)throw new Error();const data=await response.json();auth.canImport=data.capabilities?.importIncidents===true;auth.canManageAccounts=data.capabilities?.manageAccounts===true;auth.logoutMethod=data.logoutMethod||'GET';auth.user=data.authenticated===true&&['coordinator','editor'].includes(data.user?.role)?data.user:null;auth.loginUrl=data.loginUrl;auth.assistantLoginUrl=data.assistantLoginUrl;auth.logoutUrl=data.logoutUrl;}
   catch{auth.user=null;auth.canImport=false;auth.error='Не удалось проверить вход. Повторите попытку.';}
-  finally{auth.checking=false;renderAccount();refreshAssistantAuth();renderDataStatus();}
+  finally{auth.checking=false;refreshOperations(true);}
 }
 $("#account-button").addEventListener('click',()=>{const menu=$("#account-menu");menu.hidden=!menu.hidden;$("#account-button").setAttribute('aria-expanded',!menu.hidden);$("#notification-popover").hidden=true;});
 document.addEventListener('click',event=>{if(!event.target.closest('.account-area')){$("#account-menu").hidden=true;$("#account-button").setAttribute('aria-expanded','false');}if(event.target.closest('#account-retry'))checkCurrentUser();});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'){$("#account-menu").hidden=true;$("#account-button").setAttribute('aria-expanded','false');}});
 const mobileToggle=document.createElement("button");
-mobileToggle.id="mobile-filters";mobileToggle.className="filter-chip mobile-filter-toggle";mobileToggle.setAttribute("aria-expanded","false");mobileToggle.setAttribute("aria-controls","product-filter overdue-filter mine-filter");
+mobileToggle.id="mobile-filters";mobileToggle.className="filter-chip mobile-filter-toggle";mobileToggle.setAttribute("aria-expanded","false");mobileToggle.setAttribute("aria-controls","work-sort work-sla product-filter mine-filter");
 $(".reference-filters").prepend(mobileToggle);
 mobileToggle.addEventListener("click",()=>{const open=$("#toolbar").classList.toggle("filters-open");mobileToggle.setAttribute("aria-expanded",open);});
 $$('[data-icon]').forEach(el=>el.innerHTML=icon(el.dataset.icon));

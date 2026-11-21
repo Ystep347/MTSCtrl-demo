@@ -1,4 +1,4 @@
-import {sqliteTable,integer,text,index,uniqueIndex,check} from 'drizzle-orm/sqlite-core';
+import {sqliteTable,integer,text,index,uniqueIndex,check,primaryKey} from 'drizzle-orm/sqlite-core';
 import {sql} from 'drizzle-orm';
 export const imports=sqliteTable('incident_imports',{
  id:text('id').primaryKey(),version:integer('version').notNull(),revision:text('revision').notNull(),
@@ -15,8 +15,17 @@ export const events=sqliteTable('incident_events',{
 },t=>[uniqueIndex('incident_events_id_uq').on(t.id),index('incident_events_incident_seq_idx').on(t.incidentId,t.seq)]);
 
 export const appUsers=sqliteTable('app_users',{
- id:text('id').primaryKey(),username:text('username').notNull(),displayName:text('display_name').notNull(),passwordHash:text('password_hash').notNull(),role:text('role').notNull().default('coordinator'),disabled:integer('disabled').notNull().default(0),createdAt:integer('created_at').notNull()
+ id:text('id').primaryKey(),username:text('username').notNull(),displayName:text('display_name').notNull(),passwordHash:text('password_hash').notNull(),role:text('role').notNull().default('coordinator'),disabled:integer('disabled').notNull().default(0),createdAt:integer('created_at').notNull(),
+ analystTeam:text('analyst_team')
 },t=>[uniqueIndex('app_users_username_uq').on(t.username),check('app_users_role_check',sql`${t.role} IN ('coordinator','editor')`)]);
+export const incidentWorkflow=sqliteTable('incident_workflow',{
+ incidentId:text('incident_id').notNull(),sysId:text('sys_id').notNull(),version:integer('version').notNull(),
+ phase:text('phase').notNull(),pending:integer('pending').notNull(),team:text('team').notNull().default(''),
+ targetId:text('target_id'),targetName:text('target_name'),ownerId:text('owner_id'),ownerName:text('owner_name'),
+ takenAt:integer('taken_at'),updatedAt:integer('updated_at').notNull(),
+ report:text('report').notNull().default(''),reportSource:text('report_source').notNull().default('rules'),
+ detailsJson:text('details_json').notNull().default('{}')
+},t=>[primaryKey({columns:[t.incidentId,t.sysId]}),check('incident_workflow_phase_check',sql`${t.phase} IN ('new','assigned','working','deferred')`)]);
 export const appSessions=sqliteTable('app_sessions',{
  tokenHash:text('token_hash').primaryKey(),userId:text('user_id').notNull().references(()=>appUsers.id,{onDelete:'cascade'}),createdAt:integer('created_at').notNull(),expiresAt:integer('expires_at').notNull()
 },t=>[index('app_sessions_expiry_idx').on(t.expiresAt),index('app_sessions_user_idx').on(t.userId)]);

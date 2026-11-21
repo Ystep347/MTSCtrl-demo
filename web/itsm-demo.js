@@ -1,5 +1,6 @@
 import {projectMtsSimulation} from '/mts-simulation.js';
 import {isActiveIncident} from '/incidents.js';
+import {SIMPLEONE_DEMO_KEY,availableWorkflowActions,nextWorkflowState,projectWorkflowItem} from '/operations.js';
 
 const statuses = {
   working: 'Выполняется',
@@ -68,37 +69,93 @@ function renderIncident(item, source) {
   for (const id of ['incident-id', 'properties', 'incident-source', 'incident-body']) show(id);
 }
 
-const query = new URLSearchParams(location.search);
-const fromSource = query.get('dataset') === 'source';
-if (fromSource) element('dashboard-link').href = '/?dataset=source';
 
-try {
-  const id = query.get('incident');
-  if (!id || !/^INC-?\d{1,18}$/.test(id)) throw new Error('Выберите инцидент в «МТС Фокус» и откройте его в SimpleOne.');
-  const preview = query.get('preview');
-  if (preview) {
-    renderIncident(receiveLocalIncident(id, preview), 'Локальная симуляция · снимок на момент перехода');
-  } else {
-    let snapshot;
-    try {
-      const response = await fetch('/api/incidents', {cache: 'no-store', signal: AbortSignal.timeout(10000)});
-      if (!response.ok) throw new Error();
-      snapshot = await response.json();
-    } catch (error) {
-      throw new Error(error.name === 'TimeoutError'
-        ? 'Выгрузка не ответила вовремя. Обновите карточку.'
-        : 'Выгрузка недоступна. Обновите карточку.');
-    }
-    const dataset = fromSource ? snapshot : projectMtsSimulation(snapshot);
-    const item = dataset.incidents.find(row => row.id === id);
-    if (!item) throw new Error('Инцидент отсутствует в текущей выгрузке. Выберите другую карточку в «МТС Фокус».');
-    const source = fromSource ? 'Исходная выгрузка' : 'Симуляция МТС';
-    renderIncident(item, source + (snapshot.sourceWarning ? ' · сохранённая версия' : ''));
-  }
-} catch (error) {
-  write('error', error.message);
-  show('error');
-} finally {
-  element('loading').hidden = true;
-  element('record').setAttribute('aria-busy', 'false');
+const query=new URLSearchParams(location.search);
+const fromSource=query.get('dataset')==='source',guest=query.get('guest')==='1';
+const id=query.get('incident'),preview=query.get('preview');
+const executorForm=element('executor-form'),feedback=element('executor-feedback');
+let baseItem,current,sourceLabel,canConfirm=false;
+const demo=()=>{try{return JSON.parse(localStorage.getItem(SIMPLEONE_DEMO_KEY)||'null');}catch{return null;}};
+const rowKey=item=>item.id+'|'+(item.sysId||'');
+if(fromSource||guest){
+  const target=new URLSearchParams();
+  if(fromSource)target.set('dataset','source');
+  if(guest)target.set('guest','1');
+  element('dashboard-link').href='/?'+target.toString();
 }
+
+let sharedWorkflow=null;
+function renderTask(){
+  if(guest)current=demo()?.rows?.[rowKey(baseItem)]||sharedWorkflow;
+  const item=projectWorkflowItem(baseItem,current);
+  renderIncident(item,sourceLabel);
+  const executor={role:'executor',dispatchId:current?.dispatch?.id};
+  executorForm.hidden=!(canConfirm&&current?.dispatch?.state==='demo'&&availableWorkflowActions(baseItem,current,executor).includes('resolve'));
+}
+
+async function fetchSnapshot(){
+  const response=await fetch('/api/incidents',{cache:'no-store',credentials:guest?'omit':'same-origin',signal:AbortSignal.timeout(10000)});
+  if(!response.ok)throw Error('Выгрузка недоступна. Обновите карточку.');
+  const snapshot=await response.json();
+  const dataset=fromSource?snapshot:projectMtsSimulation(snapshot);
+  const item=dataset.incidents.find(row=>row.id===id);
+  if(!item)throw Error('Инцидент отсутствует в текущей выгрузке.');
+  baseItem=item;
+  sharedWorkflow=snapshot.workflow?.find(row=>row.id===id&&row.sysId===item.sysId)||null;
+  current=sharedWorkflow;
+  sourceLabel=(fromSource?'Исходная выгрузка':'Симуляция МТС')+(snapshot.sourceWarning?' · сохранённая версия':'');
+}
+
+try{
+  if(!id||!/^INC-?\d{1,18}$/.test(id))throw Error('Выберите инцидент в «МТС Фокус» и откройте его в SimpleOne.');
+  const localItem=guest?demo()?.incidents?.find(item=>item.id===id):null;
+  if(localItem||preview){
+    baseItem=localItem||receiveLocalIncident(id,preview);
+    sourceLabel='Локальная симуляция';
+  }else await fetchSnapshot();
+  if(guest)canConfirm=true;
+  else if(!preview){
+    const response=await fetch('/api/auth/me',{cache:'no-store',signal:AbortSignal.timeout(7000)});
+    canConfirm=response.ok&&(await response.json()).authenticated===true;
+  }
+  renderTask();
+}catch(error){
+  write('error',error.message);show('error');
+}finally{
+  element('loading').hidden=true;element('record').setAttribute('aria-busy','false');
+}
+
+window.addEventListener('storage',event=>{
+  if(guest&&baseItem&&event.key===SIMPLEONE_DEMO_KEY)renderTask();
+});
+if(canConfirm&&!preview&&!demo()?.incidents?.some(item=>guest&&item.id===id))setInterval(async()=>{
+  if(document.hidden||executorForm.querySelector('button').disabled)return;
+  try{await fetchSnapshot();renderTask();}catch{}
+},5000);
+
+executorForm.addEventListener('submit',async event=>{
+  event.preventDefault();
+  if(!baseItem||!current||!canConfirm||executorForm.hidden)return;
+  const note=element('executor-note').value.trim();
+  if(!note){feedback.textContent='Опишите выполненное восстановление.';return;}
+  const button=executorForm.querySelector('button');
+  button.disabled=true;feedback.textContent='';
+  try{
+    if(guest){
+      if(!preview&&!demo()?.incidents?.some(item=>item.id===id)){const expected=current;await fetchSnapshot();current=expected;}
+      const data=demo(),key=rowKey(baseItem),row=data?.rows?.[key]||sharedWorkflow;
+      if(row?.dispatch?.state!=='demo'||row.dispatch.id!==current.dispatch.id)throw Error('Учебное назначение изменилось.');
+      const executor={role:'executor',dispatchId:row.dispatch.id,displayName:row.team+' · учебный SimpleOne'};
+      data.rows[key]=nextWorkflowState(baseItem,row,{action:'resolve',version:current.version,note},executor);
+      localStorage.setItem(SIMPLEONE_DEMO_KEY,JSON.stringify(data));
+    }else{
+      const response=await fetch('/api/workflow',{method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(10000),
+        body:JSON.stringify({id:baseItem.id,action:'demo-executor-resolve',version:current.version,dispatchId:current.dispatch.id,note})});
+      const data=await response.json();
+      if(!response.ok)throw Error(data.error||'Не удалось подтвердить решение.');
+      current=data.workflow;
+    }
+    renderTask();
+  }catch(error){feedback.textContent=error.message;}
+  finally{button.disabled=false;}
+});

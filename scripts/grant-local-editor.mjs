@@ -11,6 +11,6 @@ else{
   try{
     const row=await DB.prepare('SELECT id FROM app_users WHERE username=? AND disabled=0').bind(username).first();
     if(!row){console.error('Сначала зарегистрируйте этот аккаунт на локальном сайте.');process.exitCode=1;}
-    else{await DB.prepare("UPDATE app_users SET role='editor' WHERE id=?").bind(row.id).run();console.log('Локальному аккаунту '+username+' выданы права редактора. Обновите страницу. Опубликованный сайт не изменялся.');}
+    else{await DB.prepare("UPDATE app_users SET role='editor',analyst_team=NULL WHERE id=?").bind(row.id).run();console.log('Локальному аккаунту '+username+' выданы права редактора. Обновите страницу. Опубликованный сайт не изменялся.');}
   }finally{DB.close();}
 }

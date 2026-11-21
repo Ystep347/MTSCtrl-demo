@@ -1,0 +1,1 @@
+ALTER TABLE `incident_workflow` ADD `details_json` text DEFAULT '{}' NOT NULL;

@@ -44,6 +44,10 @@
     .panel { padding: 1.2rem; overflow-wrap: anywhere; }
     .panel h2 { margin: 0 0 1rem; font-size: 1.125rem; }
     .panel h3 { margin: 1.25rem 0 .35rem; font-size: 1rem; }
+    #executor-form label { display: block; font-size: .84rem; margin-bottom: .3rem; }
+    #executor-form textarea { width: 100%; padding: .55rem; border: 1px solid var(--line); border-radius: .4rem; font: inherit; }
+    #executor-form button { margin-top: .5rem; padding: .55rem .75rem; background: #17534b; color: #fff; border: 0; border-radius: .4rem; cursor: pointer; }
+    #executor-feedback { color: #7c201e; font-size: .85rem; }
     .details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 0; }
     .assignment { display: grid; gap: 1rem; margin: 0; }
     dt { color: var(--muted); font-size: .875rem; }
@@ -70,7 +74,7 @@
   <main>
     <aside class="notice">
       <strong>Учебный стенд ITSM</strong>
-      <span>Карточка доступна для просмотра. Данные поступают из «МТС Фокус».</span>
+      <span>Здесь исполнительная команда проверяет назначение и подтверждает решение по учебной карточке.</span>
     </aside>
     <section class="record" aria-labelledby="incident-title" aria-busy="true" id="record">
       <p class="context"><span>Инциденты</span><span id="incident-id" hidden></span></p>
@@ -107,6 +111,13 @@
           <div><dt>Исполнитель</dt><dd id="incident-assignee"></dd></div>
           <div id="sysid-field" hidden><dt>Системный ID</dt><dd id="incident-sysid"></dd></div>
         </dl>
+        <form id="executor-form" hidden>
+          <h3>Подтверждение команды</h3>
+          <label for="executor-note">Как восстановили сервис</label>
+          <textarea id="executor-note" rows="3" maxlength="1000" required></textarea>
+          <button type="submit">Подтвердить решение</button>
+          <p id="executor-feedback" role="status"></p>
+        </form>
       </section>
     </div>
   </main>

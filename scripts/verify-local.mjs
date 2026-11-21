@@ -32,7 +32,8 @@ const row=(s,id)=>s.incidents.find(i=>i.id===id);
 try{
   await write(original);await start();
   const initial=await snapshot();assert.equal(initial.meta.total,44);assert.deepEqual(initial.meta.groups,{critical:0,coord:2,high:1,research:5});ok('44 source records and four canonical groups over HTTP');
-  const page=await api('/');assert.equal(page.status,200);assert.match(await page.text(),/focusGroupTabs/);
+  const page=await api('/');assert.equal(page.status,200);assert.match(await page.text(),/id="incidentQueueList"/);
+  const app=await api('/app.js');assert.equal(app.status,200);assert.match(await app.text(),/data-focus-group=/);
   for(const path of ['/guide.html','/guide/','/guide/index.html','/?screen=wallboard'])assert.equal((await api(path)).status,200);ok('dashboard, wallboard and guide routes serve successfully');
   const forged={'oai-authenticated-user-id':'forged','oai-authenticated-user-email':'preview-editor@example.test'};
   const auth=await (await api('/api/auth/me',{headers:forged})).json();assert.equal(auth.authenticated,false);

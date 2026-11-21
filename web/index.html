@@ -8,7 +8,7 @@
 <link href="/assets/mts-logo.png" rel="icon" type="image/png"/>
 <!-- Fonts: Inter & JetBrains Mono -->
 <!-- Tailwind CSS -->
-<link href="/styles.css" rel="stylesheet"/><link href="/reference-utilities.css" rel="stylesheet"/><link href="/ctrl-reference.css" rel="stylesheet"/><link href="/ctrl.css" rel="stylesheet"/><link href="/ctrl-overlays.css" rel="stylesheet"/><meta content="#f2f3f7" name="theme-color"/><script>try{document.documentElement.dataset.theme=localStorage.getItem('mts-ctrl-theme')==='night'?'night':'day'}catch{}</script><script src="/app.js" type="module"></script></head>
+<link href="/styles.css" rel="stylesheet"/><link href="/reference-utilities.css" rel="stylesheet"/><link href="/ctrl-reference.css" rel="stylesheet"/><link href="/ctrl.css" rel="stylesheet"/><link href="/ctrl-overlays.css" rel="stylesheet"/><link href="/operations.css" rel="stylesheet"/><meta content="#f2f3f7" name="theme-color"/><script>try{document.documentElement.dataset.theme=localStorage.getItem('mts-ctrl-theme')==='night'?'night':'day'}catch{}</script><script src="/app.js" type="module"></script></head>
 <body class="min-h-screen flex flex-col selection:bg-[#FF0032] selection:text-white">
 <!-- =====================================================================
        FLOATING DYNAMIC ISLAND ALERT (LIVE ATTENTION MECHANIC)
@@ -53,7 +53,6 @@
 <path d="M8 21h8M12 17v4"></path>
 </svg>
 <span>Общий экран (Видеостена)</span>
-<span class="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[#FF0032] text-white" id="wallboardPinnedBadge">4</span>
 </button>
 </div>
 </div>
@@ -99,61 +98,17 @@
 <!-- =====================================================================
        VIEW 1: "РАБОЧИЙ ЭКРАН" (COORDINATOR WORKSPACE)
        ===================================================================== -->
-<main class="flex-1 w-full max-w-[1840px] mx-auto px-4 lg:px-6 py-4 flex flex-col gap-4" id="workstationView">
+<main class="flex-1 w-full mx-auto px-4 lg:px-6 py-4 flex flex-col gap-4" id="workstationView">
 <section class="simulation-banner" aria-label="Происхождение данных"><div><strong id="simulation-label">Симуляция МТС</strong><p id="simulation-copy">Вымышленные сбои телеком-сервисов. Исполнители сохранены из учебной выгрузки.</p></div><button id="dataset-view-toggle" type="button">Показать исходные данные</button></section>
 
-<!-- TOP STRIP: SLA-КОРЗИНЫ С ЖИВЫМИ СПАРКЛАЙНАМИ + 6 ДОМЕНОВ МТС -->
-<section aria-label="Обзор SLA-корзин и экосистемы МТС" class="grid grid-cols-1 xl:grid-cols-12 gap-3.5">
-<!-- Left: 4 Clickable SLA-Bucket Cards with Live SVG Sparklines + Proportional Distribution Bar -->
-<div class="xl:col-span-7 bento-card rounded-2xl p-4 flex flex-col justify-between gap-3">
-<div class="flex flex-wrap items-center justify-between gap-2">
-<div class="flex items-center gap-2.5">
-<h2 class="text-sm font-bold tracking-tight">SLA-корзины и тренд за 1 час</h2>
-<span class="font-mono text-xs font-semibold px-2 py-0.5 rounded-lg bg-[var(--bg-muted-soft)] border border-[var(--border-hairline)] text-[var(--text-secondary)] tabular-nums" id="slaTotalPill"></span>
-</div>
-<button class="hidden text-xs font-semibold text-[#FF0032] hover:underline cursor-pointer" data-clear-sla="" id="clearSlaBucketBtn">
-            Сбросить корзину ×
-          </button>
-</div>
-<!-- 4 Clickable SLA Bucket Cards with Sparklines -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5" id="slaBucketsGrid">
-<!-- Rendered dynamically by JS -->
-</div>
-<!-- Proportional Horizontal Distribution Bar -->
-<div>
-<div class="w-full h-2 rounded-full overflow-hidden flex gap-0.5 bg-[var(--bg-muted)]" id="slaStackedBar">
-<!-- Rendered by JS -->
-</div>
-<div class="flex items-center justify-between mt-1.5 text-[11px] text-[var(--text-tertiary)]">
-<span>Распределение всех активных инцидентов по запасу SLA</span>
-<span class="font-mono font-semibold text-[var(--text-secondary)] tabular-nums" id="slaCriticalShare"></span>
-</div>
-</div>
-</div>
-<!-- Right: 6 MTS Ecosystem Domain Tiles with Signature "Живой уголок" -->
-<div class="xl:col-span-5 bento-card rounded-2xl p-4 flex flex-col justify-between gap-3">
-<div class="flex items-center justify-between gap-2">
-<div class="flex items-center gap-2">
-<h2 class="text-sm font-bold tracking-tight">Экосистема МТС</h2>
-<span class="text-[11px] text-[var(--text-secondary)] hidden sm:inline">Живой уголок — худший статус</span>
-</div>
-<button class="hidden text-xs font-semibold text-[#FF0032] hover:underline cursor-pointer" data-product-all="" id="clearDomainBtn">
-            Все домены ×
-          </button>
-</div>
-<div class="grid grid-cols-2 sm:grid-cols-3 gap-2" id="domainsGrid">
-<!-- Rendered dynamically by JS -->
-</div>
-</div>
-</section>
 <!-- MAIN SPLIT WORKSPACE: LEFT ~64% QUEUE / RIGHT ~36% AI-ШТУРМАН -->
-<section class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+<section class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start operations-workspace">
 <!-- LEFT ~64% (lg:col-span-8): INCIDENT QUEUE BENTO CARD -->
-<div class="lg:col-span-8 flex flex-col gap-3 min-w-0">
+<div class="lg:col-span-8 flex flex-col gap-3 min-w-0 operations-incidents">
 <!-- Queue Toolbar: Filter Tabs + Search -->
 <div class="bento-card rounded-2xl px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3 flex-wrap" id="toolbar">
 <div class="flex flex-wrap items-center gap-2">
-<span class="text-sm font-bold tracking-tight mr-1">Очередь инцидентов</span>
+<span class="text-sm font-bold tracking-tight mr-1">Инциденты</span>
 <div class="inline-flex flex-wrap items-center p-1 rounded-xl border border-[var(--border-hairline)] gap-0.5" id="queueTabs" style="background-color: var(--seg-bg);">
 <!-- Rendered by JS -->
 </div>
@@ -167,42 +122,34 @@
 <input aria-label="Поиск инцидентов" class="w-full h-9 pl-9 pr-8 rounded-xl text-xs bg-[var(--bg-muted-soft)] border border-[var(--border-hairline)] focus:border-[var(--border-strong)] focus:bg-[var(--bg-card)] outline-none transition-all placeholder:text-[var(--text-tertiary)]" id="search" placeholder="Поиск ID, сервиса, команды..." type="text"/>
 <kbd class="hidden sm:inline-flex items-center justify-center absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-[var(--text-tertiary)] rounded border border-[var(--border-hairline)] bg-[var(--bg-card)]">/</kbd>
 </div>
-<div class="reference-filters"><label class="select-field"><span class="sr-only">Продукт</span><select id="product-filter"><option value="all">Все продукты</option></select></label><button aria-pressed="false" class="filter-chip" id="overdue-filter">Просроченные</button><button aria-pressed="false" class="filter-chip" id="mine-filter">Координаторам</button><button class="reset-filters" hidden="" id="reset-filters">Сбросить</button><div aria-label="Вид инцидентов" class="view-switch"><button aria-label="Очередь" aria-pressed="true" class="active" data-layout="queue">Очередь</button><button aria-label="Группы" aria-pressed="false" data-layout="board">Группы</button><button aria-label="Таблица" aria-pressed="false" data-layout="table">Таблица</button></div></div></div>
+<div class="reference-filters"><label class="select-field"><span>Сортировка</span><select id="work-sort"><option value="relevance">По релевантности</option><option value="newest">Сначала новые</option><option value="sla">По сроку SLA</option><option value="product">По продукту</option></select></label><label class="select-field"><span>Срок SLA</span><select id="work-sla"><option value="">Все статусы SLA</option><option value="overdue">Просрочено</option><option value="urgent">До 15 минут</option><option value="warning">15–60 минут</option><option value="buffer">Более 60 минут</option><option value="none">Срок не указан</option></select></label><label class="select-field"><span>Экосистема МТС</span><select id="product-filter"><option value="all">Все продукты</option></select></label><button aria-pressed="false" class="filter-chip" id="mine-filter">Координаторам</button><button class="reset-filters" hidden="" id="reset-filters">Сбросить</button><div aria-label="Вид инцидентов" class="view-switch"><button aria-label="Группы" aria-pressed="true" class="active" data-layout="board">Группы</button><button aria-label="Список" aria-pressed="false" data-layout="table">Список</button></div></div></div>
 <!-- Active Filter Chips Bar -->
 <div class="hidden items-center justify-between gap-2 px-3.5 py-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-card)] text-xs" id="activeFiltersBar">
 <div class="flex flex-wrap items-center gap-2" id="activeFiltersBadges"></div>
 <button class="text-xs font-semibold text-[#FF0032] hover:underline cursor-pointer shrink-0">Сбросить все</button>
 </div>
-<!-- Table Column Header (Desktop) -->
-<nav id="focusGroupTabs" class="focus-group-tabs" aria-label="Четыре группы инцидентов"></nav>
 <div id="criticalRecovery" aria-live="polite"></div>
 <details class="coord-checks bento-card rounded-2xl" id="coordinationChecks">
 <summary><span>Что проверить координатору</span><strong id="coordinationCheckCount">0</strong></summary>
 <p class="coord-checks-note">По всей текущей выгрузке, независимо от фильтров. Подсказки по правилам; нехватка данных не означает нарушение SLA.</p>
 <div id="coordinationCheckList" class="coord-checks-list"></div>
 </details>
-<div class="hidden md:grid grid-cols-12 px-4 py-1 text-[10.5px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
-<div class="col-span-2">Приоритет / ID</div>
-<div class="col-span-4">Сервис и суть сбоя</div>
-<div class="col-span-3">Исполнитель</div>
-<div class="col-span-3 text-right pr-2">SLA / AI Риск</div>
-</div>
+<p class="incident-count" id="queueCountInfo" aria-live="polite"></p>
 <!-- Incident Rows List -->
 <div class="flex flex-col gap-2.5" id="incidentQueueList">
 <!-- Rendered by JS -->
 </div>
-<!-- Queue Footer Legend -->
-<div class="flex flex-wrap items-center justify-between gap-2 px-1 text-[11px] text-[var(--text-tertiary)]">
-<span id="queueCountInfo"></span>
-<div class="flex items-center gap-3.5">
-<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-[#FF0032]"></span>Новый / P1</span>
-<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-[#2563EB]"></span>Координаторам</span>
-<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-[#10B981]"></span>Решён</span>
+<section class="operations-panel" id="incident-dna" aria-labelledby="dna-title">
+<h2 id="dna-title">ИнциДНК</h2>
+<div class="dna-controls"><label class="dna-picker">Поиск инцидента<input type="search" id="dna-search" placeholder="Номер, текст, сервис или команда"></label>
+<label class="dna-picker">Категория<select id="dna-category"><option value="all">Все категории</option></select></label></div>
+<label class="dna-picker" for="dna-incident-picker">Инцидент на карте
+<select id="dna-incident-picker" disabled><option>Инциденты загружаются</option></select>
+</label>
+<div id="dna-graph" aria-live="polite"></div>
+</section>
 </div>
-</div>
-</div>
-<!-- RIGHT ~36% (lg:col-span-4): HIGH-CONTRAST OBSIDIAN "AI-ШТУРМАН" -->
-<aside class="lg:col-span-4 ai-obsidian rounded-2xl p-4 lg:sticky lg:top-[76px] flex flex-col gap-3 shadow-lg">
+<aside class="ai-obsidian rounded-2xl p-4 gap-3 shadow-lg" aria-label="ИИ-штурман">
 <!-- Header + "На общий экран" Pin Toggle -->
 <div class="flex items-start justify-between gap-2 pb-3 border-b border-[var(--ai-border)]">
 <div class="min-w-0">
@@ -212,15 +159,11 @@
 <path d="M12 2L14.7 9.3L22 12L14.7 14.7L12 22L9.3 14.7L2 12L9.3 9.3L12 2Z"></path>
 </svg>
 </span>
-<h2 class="text-sm font-bold tracking-tight text-white">AI-Штурман</h2>
+<h2 class="text-sm font-bold tracking-tight text-white">ИИ-штурман</h2>
 <span class="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-white/10 text-white" id="aiSelectedId"></span>
 </div>
 <p class="text-xs text-[var(--ai-text-secondary)] mt-1 truncate" id="aiSelectedSubtitle"></p>
 </div>
-<!-- Pin to Wallboard Toggle -->
-<button class="px-2.5 py-1.5 rounded-xl text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 border" id="aiPinBtn">
-<!-- Rendered by JS -->
-</button>
 </div>
 <!-- Block 1: Краткое объяснение (Что произошло) -->
 <div class="ai-subcard rounded-xl p-3">
@@ -303,190 +246,37 @@
 </div>
 </aside>
 </section>
+<section id="team-workload" class="operations-panel" aria-label="Состояние команд"></section>
 </main>
 <!-- =====================================================================
        VIEW 2: "ОБЩИЙ ЭКРАН (ВИДЕОСТЕНА)" (PANORAMIC NOC WALLBOARD)
        ===================================================================== -->
-<section class="hidden flex-1 w-full max-w-[1920px] mx-auto px-4 lg:px-6 pt-4 pb-20 flex-col gap-4" id="wallboardView"><div aria-label="Общий горизонтальный экран: графики и инциденты" class="reference-wall-scroll" role="region" tabindex="0"><div class="reference-wall-panorama flex flex-col gap-4">
-<!-- ROW 1: 6 LARGE KPI CARDS WITH SPARKLINES -->
-<div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3" id="wallboardKpiStrip">
-<!-- Rendered dynamically by JS -->
-</div>
-<!-- ROW 2 (NEW): PRIMARY LIVE CHARTS ROW (~62% INFLOW VS RESOLVED / ~38% INTERACTIVE DONUT) -->
-<div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
-<!-- Left (~62% -> xl:col-span-7): График «Приток vs Закрытие» -->
-<div class="xl:col-span-7 bento-card rounded-2xl p-5 flex flex-col justify-between gap-3">
-<div class="flex flex-wrap items-start justify-between gap-3">
-<div>
-<div class="flex flex-wrap items-center gap-2.5">
-<h2 class="text-base font-extrabold tracking-tight">Поступление и восстановление</h2>
-<span class="font-mono text-[11px] font-bold px-2.5 py-0.5 rounded-lg border" id="inflowNetBadge"></span>
-</div>
-<div class="flex flex-wrap items-center gap-4 mt-1.5 text-xs text-[var(--text-secondary)]">
-<span class="flex items-center gap-1.5">
-<span class="w-2.5 h-2.5 rounded-full bg-[#FF0032]"></span>
-                Новые (Приток)
-              </span>
-<span class="flex items-center gap-1.5">
-<span class="w-2.5 h-2.5 rounded-full bg-[#10B981]"></span>
-                Восстановленные сервисы
-              </span>
-<span class="hidden sm:inline text-[var(--text-tertiary)]">· Наведите для детализации</span>
-</div>
-</div>
-<!-- 2 часа / 4 часа Toggle -->
-<div class="inline-flex items-center p-1 rounded-xl border border-[var(--border-hairline)] shrink-0" style="background-color: var(--seg-bg);">
-<button aria-pressed="false" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer" data-chart-interval="6" id="range2hBtn">По 6 часов</button>
-<button aria-pressed="false" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer" data-chart-interval="24" id="range4hBtn">По дням</button>
-</div>
-</div>
-<!-- Dual-Series SVG Area/Line Chart Container -->
-<div class="relative w-full h-[220px] sm:h-[245px] select-none" id="inflowChartWrap">
-<svg class="w-full h-full overflow-visible" id="inflowChartSvg" preserveaspectratio="none" viewbox="0 0 720 240"></svg>
-<div class="chart-tooltip hidden absolute z-20 px-3 py-2 rounded-xl text-xs leading-snug whitespace-nowrap" id="inflowTooltip">
-</div>
-</div>
-</div>
-<!-- Right (~38% -> xl:col-span-5): Интерактивная кольцевая диаграмма статусов и приоритетов -->
-<div class="xl:col-span-5 bento-card rounded-2xl p-5 flex flex-col justify-between gap-3">
-<div class="flex flex-wrap items-center justify-between gap-2">
-<div>
-<h2 class="text-base font-extrabold tracking-tight">Структура инцидентов</h2>
-<p class="text-xs text-[var(--text-secondary)] mt-0.5">Распределение полной выгрузки</p>
-</div>
-<!-- Toggle: По статусам / По приоритетам -->
-<div class="inline-flex items-center p-1 rounded-xl border border-[var(--border-hairline)] shrink-0" style="background-color: var(--seg-bg);">
-<button aria-pressed="false" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer" data-chart-donut="statuses" id="donutStatusBtn">
-              По статусам
-            </button>
-<button aria-pressed="false" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer" data-chart-donut="priorities" id="donutPriorityBtn">
-              По приоритетам
-            </button>
-</div>
-</div>
-<!-- Donut Ring + Interactive Legend -->
-<div class="flex-1 grid grid-cols-1 sm:grid-cols-12 items-center gap-4 py-1">
-<!-- Donut SVG -->
-<div class="sm:col-span-6 flex items-center justify-center">
-<div class="relative w-[196px] h-[196px]">
-<svg class="w-full h-full -rotate-90" id="donutChartSvg" viewbox="0 0 200 200"></svg>
-<!-- Center Readout -->
-<div class="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-4">
-<span class="font-mono text-3xl font-extrabold leading-none tabular-nums" id="donutCenterValue"></span>
-<span class="text-[11px] font-semibold text-[var(--text-secondary)] mt-1 leading-tight" id="donutCenterLabel"></span>
-<span class="font-mono text-[11px] font-bold text-[#FF0032] mt-0.5 h-4" id="donutCenterPct"></span>
-</div>
-</div>
-</div>
-<!-- Interactive Legend Rows -->
-<div class="sm:col-span-6 flex flex-col gap-2" id="donutLegend">
-<!-- Rendered by JS -->
-</div>
-</div>
-</div>
-</div>
-<!-- ROW 3: OPERATIONAL WALLBOARD GRID (FOCUS P1 | HEATMAP 6x4 + TEAM STACKED BARS | AI RADAR) -->
-<div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
-<!-- Column 1 (xl:col-span-4): ФОКУС P1 И ЗАКРЕПЛЁННЫЕ -->
-<div class="xl:col-span-4 flex flex-col gap-3">
-<div class="flex items-center justify-between px-1">
-<div class="flex items-center gap-2">
-<span class="w-2.5 h-2.5 rounded-full bg-[#FF0032] pulse-surgical"></span>
-<h2 class="text-base font-extrabold tracking-tight">Фокус P1 и закреплённые</h2>
-</div>
-<span class="font-mono text-xs font-bold px-2.5 py-0.5 rounded-lg bg-[#FF0032]/12 text-[#FF0032]" id="wallboardFocusCount"></span>
-</div>
-<div class="flex flex-col gap-2.5 flex-1" id="wallboardFocusCards">
-<!-- Rendered by JS -->
-</div>
-</div>
-<!-- Column 2 (xl:col-span-5): HEATMAP 6x4 + HORIZONTAL STACKED TEAM LOAD BARS -->
-<div class="xl:col-span-5 flex flex-col gap-4">
-<!-- Heatmap Matrix 6x4 -->
-<div class="bento-card rounded-2xl p-4 sm:p-5 flex flex-col gap-3">
-<div class="flex flex-wrap items-center justify-between gap-2">
-<div>
-<h2 class="text-base font-extrabold tracking-tight" id="heatmapTitle">Тепловая матрица: Продукты × SLA</h2>
-<p class="text-xs text-[var(--text-secondary)] mt-0.5">Клик по ячейке открывает срез в Рабочем экране</p>
-</div>
-<span class="font-mono text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-[var(--bg-muted-soft)] border border-[var(--border-hairline)] text-[var(--text-secondary)]">
-              5 × 4
-            </span>
-</div>
-<div class="overflow-x-auto">
-<table class="w-full border-separate border-spacing-1 text-center">
-<thead>
-<tr class="text-[10.5px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
-<th class="text-left pb-1 pl-1.5">Домен МТС</th>
-<th class="pb-1 text-[#FF0032]">&lt;5м</th>
-<th class="pb-1 text-[#D97706] dark:text-[#FBBF24]">5–15м</th>
-<th class="pb-1 text-[#2563EB]">15–60м</th>
-<th class="pb-1 text-[var(--text-tertiary)]">&gt;1ч</th>
-<th class="pb-1 text-right pr-1.5">Всего</th>
-</tr>
-</thead>
-<tbody id="wallboardHeatmapBody">
-<!-- Rendered by JS -->
-</tbody>
-</table>
-</div>
-</div>
-<!-- Horizontal Stacked Bar Chart: Загрузка дежурных команд -->
-<div class="bento-card rounded-2xl p-4 sm:p-5 flex-1 flex flex-col justify-between gap-3">
-<div class="flex flex-wrap items-center justify-between gap-2">
-<h2 class="text-base font-extrabold tracking-tight">Загрузка дежурных команд</h2>
-<div class="flex items-center gap-3 text-[11px] font-semibold text-[var(--text-secondary)]">
-<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-[#FF0032]"></span>P1</span>
-<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-[#F59E0B]"></span>P2</span>
-<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-[#2563EB]"></span>P3</span>
-</div>
-</div>
-<div class="flex flex-col gap-2.5" id="wallboardTeamLoad">
-<!-- Rendered by JS -->
-</div>
-</div>
-</div>
-<!-- Column 3 (xl:col-span-3): AI-РАДАР ЭСКАЛАЦИЙ + ХРОНИКА ЗАЛА -->
-<div class="xl:col-span-3 flex flex-col gap-4">
-<div class="ai-obsidian rounded-2xl p-5 flex flex-col gap-3 shadow-lg live-corner-host" id="wallboardAiRadar">
-<!-- Rendered by JS -->
-</div>
-<div class="bento-card rounded-2xl p-4 sm:p-5 flex-1 flex flex-col gap-2.5">
-<div class="flex items-center justify-between">
-<h2 class="text-sm font-extrabold tracking-tight">Хроника зала (Live)</h2>
-<span class="font-mono text-xs font-semibold text-[var(--text-secondary)] tabular-nums" id="wallboardClock"></span>
-</div>
-<div class="flex flex-col gap-2 overflow-y-auto custom-scroll max-h-[300px] pr-1" id="wallboardLiveStream">
-<!-- Rendered by JS -->
-</div>
-</div>
-</div>
-</div>
-<!-- BOTTOM FIXED PANORAMIC TICKER (БЕГУЩАЯ СТРОКА) -->
-<div class="fixed bottom-0 left-0 right-0 z-30 border-t border-[var(--border-hairline)] bg-[var(--bg-card)] shadow-2xl">
-<div class="max-w-[1920px] mx-auto h-12 px-4 lg:px-6 flex items-center gap-3">
-<div class="flex items-center gap-2 shrink-0 pr-3 border-r border-[var(--border-hairline)]">
-<span class="w-2 h-2 rounded-full bg-[#FF0032] pulse-surgical"></span>
-<span class="text-[11px] font-extrabold uppercase tracking-wider">Эфир МТС Ctrl</span>
-</div>
-<div class="marquee-container flex-1 overflow-hidden relative">
-<div class="marquee-track items-center gap-6" id="wallboardMarqueeTrack">
-<!-- Rendered by JS -->
-</div>
-</div>
-<button class="shrink-0 h-8 px-3 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-muted-soft)] hover:bg-[var(--bg-muted)] text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer" data-ticker-toggle="" id="marqueeToggleBtn">
-<span id="marqueeToggleIcon">
-<svg class="w-3.5 h-3.5" fill="currentColor" viewbox="0 0 24 24"><rect height="16" rx="1" width="4" x="6" y="4"></rect><rect height="16" rx="1" width="4" x="14" y="4"></rect></svg>
-</span>
-<span id="marqueeToggleLabel">Пауза</span>
-</button>
-</div>
-</div>
-<section class="reference-four-groups"><h2 class="text-base font-extrabold mb-3">Четыре группы в фокусе</h2><div id="reference-groups"></div></section></div></div></section><section class="reference-alternate" hidden="" id="alternate-view"><h1 id="page-title"></h1><p id="page-subtitle"></p><div id="alternate-screen"></div></section>
+<section id="wallboardView" class="wallboard-screen" hidden aria-label="Видеостена">
+  <header class="wallboard-header">
+    <div class="wallboard-brand"><img src="/assets/mts-logo.png" alt="" width="34" height="34"><div><h1>Инциденты в фокусе</h1><p id="wallRecovery" role="status" hidden></p></div></div>
+    <div class="wallboard-controls"><time id="wallboardClock"></time><button class="button button-secondary" data-fullscreen>На весь экран</button><button class="button button-secondary" data-screen-mode="workstation">Рабочий экран</button></div>
+  </header>
+  <div id="wallboardBoard" class="wallboard-board"></div>
+  <section class="wallboard-chart bento-card" aria-labelledby="wallboard-chart-title">
+    <header><h2 id="wallboard-chart-title">Поступление и восстановление</h2><div class="wallboard-chart-legend"><span>Поступило</span><span>Восстановлено</span></div></header>
+    <div id="inflowChartWrap" class="ref-inflow-chart"></div>
+  </section>
+</section>
+<section class="reference-alternate" hidden="" id="alternate-view"><h1 id="page-title"></h1><p id="page-subtitle"></p><div id="alternate-screen"></div></section>
 <!-- =====================================================================
        APPLICATION ENGINE: STATE, DATA, LIVE CHARTS & SIMULATOR
        ===================================================================== -->
-<div class="notification-popover" hidden="" id="notification-popover"></div><div class="drawer-backdrop" hidden="" id="drawer-backdrop"></div><section aria-labelledby="drawer-title" aria-modal="true" class="drawer" hidden="" id="drawer" role="dialog"></section><dialog class="about-dialog" id="about-dialog"><div class="about-icon" data-icon="focus"></div><h2>Инциденты в фокусе</h2><p>Рабочее место координатора: увидеть важную проблему, найти ответственных и проследить за восстановлением сервиса.</p><div class="about-note"><strong>Текущая версия</strong><p>Показывает общую сохранённую выгрузку, четыре группы, сроки и историю событий. Редактор может загрузить обновление для всей команды. Демонстрация меняет только ваш экран. Нейросетевой помощник и переходы в систему учёта ещё не подключены.</p></div><p>Откройте «Как всё работает», чтобы пройти рабочий сценарий и посмотреть список оставшихся задач.</p><form method="dialog"><button class="button button-primary">Понятно</button></form></dialog><button aria-controls="assistant-panel" aria-haspopup="dialog" class="assistant-launcher" id="assistant-launcher"><span data-icon="sparkle"></span><span>Спросить ИИ</span></button><div class="assistant-backdrop" hidden="" id="assistant-backdrop"></div><section aria-labelledby="assistant-title" aria-modal="true" class="assistant-panel" hidden="" id="assistant-panel" role="dialog"></section><dialog aria-labelledby="import-title" class="import-dialog" id="import-dialog">
+<div id="workflow-alerts" class="workflow-alerts" role="status" aria-live="polite" hidden></div>
+<dialog id="workflow-dialog" class="operations-dialog" aria-labelledby="workflow-dialog-title">
+  <form id="workflow-form"><h2 id="workflow-dialog-title"></h2><p id="workflow-dialog-incident"></p>
+    <p id="workflow-dialog-connection" hidden></p>
+    <label id="workflow-team-field">Исполнительная команда<select name="team"></select></label>
+    <label><span id="workflow-note-label">Комментарий</span><textarea name="note" rows="3" maxlength="1000"></textarea></label>
+    <p id="workflow-dialog-error" role="alert" hidden></p>
+    <div class="workflow-actions"><button type="button" class="button button-secondary" id="workflow-cancel">Отмена</button><button class="button button-primary" type="submit">Сохранить</button></div>
+  </form>
+</dialog>
+<div class="notification-popover" hidden="" id="notification-popover"></div><div class="drawer-backdrop" hidden="" id="drawer-backdrop"></div><section aria-labelledby="drawer-title" aria-modal="true" class="drawer" hidden="" id="drawer" role="dialog"></section><dialog class="about-dialog" id="about-dialog"><div class="about-icon" data-icon="focus"></div><h2>Инциденты в фокусе</h2><p>Рабочий экран аналитика-координатора для передачи инцидентов исполнительным командам, подтверждения решения и расследования.</p><div class="about-note"><strong>Текущая версия</strong><p>Аналитик передаёт инцидент исполнительной команде через SimpleOne. Решение может подтвердить аналитик или команда. После этого инцидент можно закрыть или направить на расследование.</p></div><p>Откройте «Как всё работает», чтобы пройти рабочий сценарий и посмотреть список оставшихся задач.</p><form method="dialog"><button class="button button-primary">Понятно</button></form></dialog><button aria-controls="assistant-panel" aria-haspopup="dialog" class="assistant-launcher" id="assistant-launcher"><span data-icon="sparkle"></span><span>Спросить ИИ</span></button><div class="assistant-backdrop" hidden="" id="assistant-backdrop"></div><section aria-labelledby="assistant-title" aria-modal="true" class="assistant-panel" hidden="" id="assistant-panel" role="dialog"></section><dialog aria-labelledby="import-title" class="import-dialog" id="import-dialog">
 <header class="import-heading"><div><div class="eyebrow">ОБЩИЕ ДАННЫЕ КОМАНДЫ</div><h2 id="import-title">Обновить выгрузку</h2></div><button aria-label="Закрыть загрузку" class="icon-button" id="import-close">×</button></header>
 <p class="import-intro">После подтверждения изменения увидят все участники с доступом к сайту. Предыдущие версии и история сохранятся.</p>
 <div id="import-access-note"></div>
