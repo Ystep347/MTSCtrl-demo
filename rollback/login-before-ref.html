@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ru" data-theme="day">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>Вход · МТС Фокус</title>
+  <link rel="icon" type="image/png" href="/assets/mts-logo.png">
+  <link rel="stylesheet" href="/ctrl-reference.css">
+  <script>
+    try {
+      if (localStorage.getItem('mts-ctrl-theme') === 'night') {
+        document.documentElement.dataset.theme = 'night';
+        document.querySelector('meta[name="theme-color"]').content = '#131722';
+      }
+    } catch {}
+  </script>
+  <script src="/login.js" defer></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --entry-canvas: #0b0e14;
+      --entry-error: #a20023;
+      --entry-error-bg: #fff1f3;
+      background: var(--entry-canvas);
+    }
+    :root[data-theme="night"] { color-scheme: dark; --entry-error: #ff9bb0; --entry-error-bg: #321827; }
+    [hidden] { display: none !important; }
+    body { min-height: 100vh; min-height: 100dvh; margin: 0; display: flex; flex-direction: column; background-color: var(--entry-canvas); }
+    button, input { font: inherit; }
+    a { color: inherit; text-underline-offset: .2em; }
+    :focus-visible { outline: 2px solid #ff0032; outline-offset: 3px; }
+    .entry-topbar {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem 1rem;
+      padding: .625rem clamp(1rem, 4vw, 3rem);
+      background-color: var(--bg-card);
+    }
+    .entry-brand { display: inline-flex; align-items: center; gap: .625rem; font-weight: 750; text-decoration: none; }
+    .entry-brand img { width: 2.25rem; height: 2.25rem; flex: none; display: block; }
+    .entry-guide { color: var(--text-secondary); font-size: .875rem; font-weight: 600; }
+    .entry-main { flex: 1 0 auto; display: grid; place-items: center; padding: 1rem; }
+    .entry-story { display: none; }
+    .entry-card { width: min(100%, 28rem); padding: clamp(1rem, 4vw, 1.75rem); border-radius: 1rem; }
+    .entry-card h1 { margin: 0; font-size: clamp(1.45rem, 4vw, 1.875rem); line-height: 1.2; letter-spacing: -.025em; }
+    .entry-register-title, .entry-card:has(#register-tab[aria-pressed="true"]) .entry-login-title { display: none; }
+    .entry-card:has(#register-tab[aria-pressed="true"]) .entry-register-title { display: inline; }
+    .entry-intro { margin: .35rem 0 0; color: var(--text-secondary); font-size: .875rem; line-height: 1.45; }
+    .entry-tabs {
+      display: grid; grid-template-columns: 1fr 1fr; gap: .25rem;
+      background: var(--seg-bg); border: 1px solid var(--border-hairline);
+      border-radius: .75rem; padding: .25rem; margin: 1rem 0;
+    }
+    .entry-tabs button {
+      min-height: 2.375rem; background: transparent; border: 0;
+      border-radius: .55rem; color: var(--text-secondary); font-size: .875rem; font-weight: 700; cursor: pointer;
+    }
+    .entry-tabs button[aria-pressed="true"] { color: var(--seg-active-text); background: var(--seg-active-bg); box-shadow: var(--seg-active-shadow); }
+    .entry-form, .entry-fields { display: grid; gap: .75rem; }
+    .entry-fields:has(#display-name-field:not([hidden])) { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; }
+    .entry-fields label { display: grid; gap: .3rem; font-size: .875rem; line-height: 1.3; font-weight: 650; }
+    .entry-fields input {
+      min-width: 0; width: 100%; min-height: 2.75rem; padding: .5rem .625rem;
+      background: var(--bg-muted-soft); color: var(--text-primary);
+      border: 1px solid var(--border-strong); border-radius: .625rem; font-size: 1rem; font-weight: 400;
+    }
+    .entry-fields input:focus { border-color: #ff0032; }
+    .entry-rules, .entry-error { margin: 0; font-size: .875rem; line-height: 1.4; }
+    .entry-rules { color: var(--text-secondary); }
+    .entry-error { border: 1px solid #ff003256; padding: .45rem .65rem; border-radius: .5rem; color: var(--entry-error); background: var(--entry-error-bg); }
+    .entry-submit { min-height: 2.75rem; padding: .5rem .75rem; border: 0; border-radius: .625rem; background: #df002c; color: #fff; font-weight: 700; cursor: pointer; }
+    .entry-submit:hover { background: #c70027; }
+    .entry-submit:disabled { opacity: .65; cursor: wait; }
+    .entry-links {
+      display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: .5rem 1rem;
+      margin-top: .875rem; padding-top: .75rem; border-top: 1px solid var(--border-hairline);
+      color: var(--text-secondary); font-size: .875rem; line-height: 1.4;
+    }
+    .entry-links > a { color: var(--text-primary); font-weight: 650; }
+    .entry-service summary { cursor: pointer; }
+    .entry-service a { display: block; margin-top: .35rem; }
+    @media (max-height: 37.5rem) {
+      .entry-topbar { padding-block: .375rem; }
+      .entry-brand img { width: 2rem; height: 2rem; }
+      .entry-main { padding: .5rem .75rem; }
+      .entry-card { padding: .75rem 1rem; }
+      .entry-intro { display: none; }
+      .entry-tabs { margin-block: .5rem; }
+      .entry-form, .entry-fields { gap: .5rem; }
+      .entry-links { gap: .35rem .5rem; margin-top: .5rem; padding-top: .5rem; }
+    }
+    @media (min-width: 34rem) and (max-height: 30rem) {
+      .entry-card {
+        width: min(100%, 38rem);
+        display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr);
+        gap: .75rem 1.25rem; align-items: start;
+      }
+      .entry-heading { grid-area: 1 / 1; }
+      .entry-card h1 { font-size: 1.375rem; }
+      .entry-tabs { grid-template-columns: 1fr; margin: .75rem 0 0; }
+      .entry-form { grid-area: 1 / 2 / span 2; }
+      .entry-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .entry-links { grid-area: 2 / 1; display: grid; align-self: end; margin-top: 0; }
+    }
+    @media (min-width: 56rem) {
+      .entry-main {
+        width: min(100%, 74rem); margin-inline: auto; padding-inline: clamp(1.5rem, 4vw, 3rem);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: clamp(2rem, 6vw, 5rem); justify-items: stretch;
+      }
+      .entry-story { display: block; color: var(--text-primary); }
+      .entry-story-label { margin: 0 0 .75rem; color: var(--text-secondary); font-size: .875rem; font-weight: 700; }
+      .entry-story-title {
+        margin: 0; font-size: clamp(2rem, 3.2vw, 2.875rem);
+        line-height: 1.15; font-weight: 750; letter-spacing: -.035em;
+      }
+      .entry-story-title span { display: block; color: var(--text-secondary); }
+      .entry-story-copy { max-width: 26rem; margin: 1rem 0 0; color: var(--text-secondary); line-height: 1.6; }
+      .entry-card { justify-self: end; }
+    }
+  </style>
+</head>
+<body>
+  <header class="entry-topbar topbar-glass">
+    <a href="/" target="_top" class="entry-brand">
+      <img src="/assets/mts-logo.png" width="36" height="36" alt="МТС"> Фокус
+    </a>
+    <a href="/guide.html" target="_top" class="entry-guide">Руководство</a>
+  </header>
+  <main class="entry-main">
+    <div class="entry-story" data-theme="night">
+      <p class="entry-story-label">Пульт координатора</p>
+      <p class="entry-story-title">Инциденты. Команды. <span>Всё под контролем.</span></p>
+      <p class="entry-story-copy">Видно, где возник сбой, кто его устраняет и сколько времени осталось на восстановление.</p>
+    </div>
+    <section class="entry-card bento-card" aria-labelledby="login-title">
+      <div class="entry-heading">
+        <h1 id="login-title"><span class="entry-login-title">Вход в Фокус</span><span class="entry-register-title">Создание аккаунта</span></h1>
+        <p class="entry-intro">Аккаунт открывает доступ к помощнику и личному профилю.</p>
+        <div class="entry-tabs" role="group" aria-label="Вход и регистрация">
+          <button type="button" id="login-tab" aria-pressed="true">Войти</button>
+          <button type="button" id="register-tab" aria-pressed="false">Создать аккаунт</button>
+        </div>
+      </div>
+      <form class="entry-form" id="password-form">
+        <div class="entry-fields">
+          <label id="display-name-field" hidden>Ваше имя
+            <input id="display-name" name="displayName" autocomplete="name" maxlength="80" minlength="2">
+          </label>
+          <label>Логин
+            <input id="username" name="username" autocomplete="username" required minlength="3" maxlength="32" pattern="[A-Za-z][A-Za-z0-9._\-]{2,31}" autocapitalize="none" spellcheck="false">
+          </label>
+          <label>Пароль
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+          </label>
+          <label id="confirm-password-field" hidden>Повторите пароль
+            <input id="confirm-password" type="password" autocomplete="new-password">
+          </label>
+        </div>
+        <p class="entry-rules" id="password-rules" hidden>Логин латиницей. Пароль от 10 символов.</p>
+        <p class="entry-error" id="login-error" role="alert" hidden></p>
+        <button class="entry-submit" id="login-submit" type="submit">Войти в Фокус</button>
+      </form>
+      <footer class="entry-links">
+        <a href="/" target="_top">Открыть как гость</a>
+        <details class="entry-service">
+          <summary>Служебный вход</summary>
+          <a href="{{AUTH_URL}}" target="_top">Войти как редактор</a>
+        </details>
+      </footer>
+    </section>
+  </main>
+</body>
+</html>

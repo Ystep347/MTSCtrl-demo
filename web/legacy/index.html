@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e30611">
+  <meta name="description" content="Интерактивный прототип дашборда координатора IT-инцидентов по кейсу МТС.">
+  <title>Фокус · Дашборд координатора МТС</title>
+  <link rel="icon" type="image/png" href="/assets/mts-logo.png">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" type="module"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Перейти к инцидентам</a>
+  <div class="shell">
+    <aside class="rail" aria-label="Основная навигация">
+      <a class="brand" href="/" aria-label="МТС Фокус"><img src="/assets/mts-logo.png" width="44" height="44" alt=""></a>
+      <div class="rail-divider"></div>
+      <nav class="rail-nav">
+        <button class="nav-item active" data-view="dashboard" aria-current="page"><span data-icon="grid"></span><span>Обзор</span></button>
+        <button class="nav-item" data-view="journal"><span data-icon="activity"></span><span>Журнал</span></button>
+        <button class="nav-item" data-view="teams"><span data-icon="users"></span><span>Команды</span></button>
+      </nav>
+      <div class="rail-bottom"><button class="nav-item" id="about-button"><span data-icon="help"></span><span>О продукте</span></button><span class="rail-label">ФОКУС</span></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <div class="product-name"><span class="product-mark" data-icon="focus"></span><strong>Фокус</strong><span class="topbar-divider"></span><span class="product-subtitle">Пульт координатора</span></div>
+        <div class="topbar-right"><a class="guide-shortcut" href="/guide.html" target="_top" aria-label="Как всё работает"><span data-icon="help"></span><span class="guide-shortcut-label">Как всё работает</span></a><span class="prototype-tag">Прототип</span><time id="clock"></time><button class="icon-button notification-button" id="notification-button" aria-label="Уведомления" aria-expanded="false"><span data-icon="bell"></span><span class="notification-dot" id="notification-dot"></span></button><div class="account-area"><button class="account-trigger" id="account-button" aria-expanded="false" aria-controls="account-menu" aria-label="Вход и профиль"><span id="account-label">Войти</span><span class="profile" id="account-avatar">Г</span></button><div class="account-menu" id="account-menu" hidden></div></div></div>
+      </header>
+      <main id="main" tabindex="-1">
+        <div class="page-heading"><div><div class="eyebrow">ОПЕРАЦИОННЫЙ ЦЕНТР</div><h1 id="page-title">Инциденты в фокусе</h1><p id="page-subtitle">Ситуация, ответственные и сроки — на одном экране.</p></div><div class="heading-actions"><div class="scenario-anchor"><button class="button button-secondary" id="scenarios-button" aria-expanded="false"><span data-icon="sliders"></span>Сценарии<span class="small-icon" data-icon="chevron"></span></button><div id="scenario-menu" class="scenario-menu" hidden></div></div><button class="button button-primary" id="demo-button"><span data-icon="play"></span><span>Запустить демо</span></button></div></div>
+        <section id="data-status" class="data-status" aria-label="Источник данных"></section>
+        <div id="dashboard-top"></div>
+        <section class="toolbar" id="toolbar" aria-label="Поиск и фильтры"><label class="search-field"><span data-icon="search"></span><input id="search" type="search" autocomplete="off" placeholder="Найти инцидент, продукт или команду" aria-label="Поиск инцидентов"><kbd>/</kbd></label><label class="select-field"><span class="sr-only">Продукт</span><select id="product-filter"><option value="all">Все продукты</option></select><span data-icon="chevron"></span></label><button class="filter-chip" id="overdue-filter" aria-pressed="false"><span data-icon="timer"></span>Просроченные</button><button class="filter-chip" id="mine-filter" aria-pressed="false"><span data-icon="users"></span>Координаторам</button><button class="reset-filters" id="reset-filters" hidden>Сбросить</button><div class="view-switch" aria-label="Вид инцидентов"><button data-layout="board" class="active" aria-label="Группы" aria-pressed="true"><span data-icon="grid"></span></button><button data-layout="table" aria-label="Таблица" aria-pressed="false"><span data-icon="list"></span></button></div></section>
+        <div id="screen"></div>
+        <footer class="page-footer"><span><span class="footer-mark"></span>Данные организаторов · прототип</span><a class="guide-link" href="/guide.html" target="_top">Как всё работает</a><span id="updated-at"></span></footer>
+      </main>
+    </div>
+  </div>
+  <div class="notification-popover" id="notification-popover" hidden></div>
+  <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
+  <section class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" hidden></section>
+  <dialog class="about-dialog" id="about-dialog"><div class="about-icon" data-icon="focus"></div><h2>Инциденты в фокусе</h2><p>Рабочее место координатора: увидеть важную проблему, найти ответственных и проследить за восстановлением сервиса.</p><div class="about-note"><strong>Текущая версия</strong><p>Показывает общую сохранённую выгрузку, четыре группы, сроки и историю событий. Редактор может загрузить обновление для всей команды. Демонстрация меняет только ваш экран. Нейросетевой помощник и переходы в систему учёта ещё не подключены.</p></div><p>Откройте «Как всё работает», чтобы пройти рабочий сценарий и посмотреть список оставшихся задач.</p><form method="dialog"><button class="button button-primary">Понятно</button></form></dialog>
+  <button class="assistant-launcher" id="assistant-launcher" aria-haspopup="dialog" aria-controls="assistant-panel"><span data-icon="sparkle"></span><span>Спросить ИИ</span></button>
+  <div class="assistant-backdrop" id="assistant-backdrop" hidden></div>
+  <section class="assistant-panel" id="assistant-panel" role="dialog" aria-modal="true" aria-labelledby="assistant-title" hidden></section>
+  <dialog id="import-dialog" class="import-dialog" aria-labelledby="import-title">
+    <header class="import-heading"><div><div class="eyebrow">ОБЩИЕ ДАННЫЕ КОМАНДЫ</div><h2 id="import-title">Обновить выгрузку</h2></div><button class="icon-button" id="import-close" aria-label="Закрыть загрузку">×</button></header>
+    <p class="import-intro">После подтверждения изменения увидят все участники с доступом к сайту. Предыдущие версии и история сохранятся.</p>
+    <div id="import-access-note"></div>
+    <div id="import-editor-area"><label class="import-file-label" for="import-file">Выберите обновлённую выгрузку</label><input id="import-file" type="file" accept=".json,application/json"><p class="import-limit">До 500 инцидентов, не более 1 МБ.</p><div id="import-preview"></div><div class="import-error" id="import-error" role="alert" hidden></div><button id="import-refresh-preview" class="button button-secondary" hidden>Обновить предпросмотр</button></div>
+    <footer class="import-footer"><a class="import-export" href="/api/incidents/export">Скачать текущую выгрузку</a><button class="button button-secondary" id="import-cancel">Отмена</button><button class="button button-primary" id="import-submit" disabled>Загрузить для всех</button></footer>
+  </dialog>
+  <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="false"></div>
+</body>
+</html>

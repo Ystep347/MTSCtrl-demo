@@ -1,0 +1,268 @@
+/* Theme and visual primitives copied from the user supplied ctrl (1).html. */
+
+    /* =====================================================================
+       SWISS ARCHITECTURAL BENTO — THEME TOKENS (ДНЕВНАЯ / НОЧНАЯ ТЕМА)
+       ===================================================================== */
+    :root,
+    [data-theme="day"] {
+      --bg-canvas: #F2F3F7;
+      --bg-card: #FFFFFF;
+      --bg-card-hover: #F8FAFC;
+      --bg-muted: #E9ECF2;
+      --bg-muted-soft: #F4F6FA;
+      --bg-topbar: rgba(255, 255, 255, 0.92);
+      --border-hairline: #E2E6EE;
+      --border-strong: #CBD5E1;
+      --text-primary: #111827;
+      --text-secondary: #64748B;
+      --text-tertiary: #94A3B8;
+
+      --seg-bg: #EAECEF;
+      --seg-active-bg: #FFFFFF;
+      --seg-active-text: #111827;
+      --seg-active-shadow: 0 1px 3px rgba(17, 24, 39, 0.08), 0 1px 1px rgba(17, 24, 39, 0.04);
+
+      /* High-contrast Obsidian AI Panel (remains sleek dark in Day mode) */
+      --ai-bg: #11131A;
+      --ai-subcard: #181C27;
+      --ai-border: #262C3D;
+      --ai-text-primary: #F8FAFC;
+      --ai-text-secondary: #94A3B8;
+      --ai-text-muted: #64748B;
+
+      /* Chart Tokens */
+      --chart-grid: rgba(100, 116, 139, 0.16);
+      --chart-axis: #64748B;
+      --chart-crosshair: rgba(17, 24, 39, 0.28);
+      --tooltip-bg: #11131A;
+      --tooltip-border: rgba(255, 255, 255, 0.14);
+      --tooltip-text: #F8FAFC;
+
+      --shadow-bento: 0 1px 2px rgba(17, 24, 39, 0.04), 0 6px 18px rgba(17, 24, 39, 0.025);
+      --shadow-selected: 0 0 0 1.5px #111827, 0 8px 22px rgba(17, 24, 39, 0.08);
+      --shadow-selected-p1: 0 0 0 1.5px #FF0032, 0 8px 22px rgba(255, 0, 50, 0.14);
+
+      --heat-zero-bg: #F6F8FB;
+      --heat-zero-text: #B0B8C7;
+      --donut-track: #EEF1F6;
+    }
+
+    [data-theme="night"] {
+      --bg-canvas: #0B0E14;
+      --bg-card: #131722;
+      --bg-card-hover: #191F2E;
+      --bg-muted: #1E2536;
+      --bg-muted-soft: #171C29;
+      --bg-topbar: rgba(19, 23, 34, 0.92);
+      --border-hairline: #232A3B;
+      --border-strong: #36415C;
+      --text-primary: #F8FAFC;
+      --text-secondary: #94A3B8;
+      --text-tertiary: #64748B;
+
+      --seg-bg: #0D1018;
+      --seg-active-bg: #1E2538;
+      --seg-active-text: #F8FAFC;
+      --seg-active-shadow: 0 1px 4px rgba(0, 0, 0, 0.48);
+
+      --ai-bg: #101422;
+      --ai-subcard: #171D30;
+      --ai-border: #28324D;
+      --ai-text-primary: #F8FAFC;
+      --ai-text-secondary: #9CA8C2;
+      --ai-text-muted: #6C7894;
+
+      /* Chart Tokens */
+      --chart-grid: rgba(148, 163, 184, 0.14);
+      --chart-axis: #94A3B8;
+      --chart-crosshair: rgba(248, 250, 252, 0.28);
+      --tooltip-bg: #1E2536;
+      --tooltip-border: rgba(255, 255, 255, 0.16);
+      --tooltip-text: #F8FAFC;
+
+      --shadow-bento: 0 2px 12px rgba(0, 0, 0, 0.32);
+      --shadow-selected: 0 0 0 1.5px #F8FAFC, 0 8px 24px rgba(0, 0, 0, 0.5);
+      --shadow-selected-p1: 0 0 0 1.5px #FF0032, 0 8px 24px rgba(255, 0, 50, 0.24);
+
+      --heat-zero-bg: #0F131C;
+      --heat-zero-text: #444E63;
+      --donut-track: #1C2334;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      transition: background-color 0.24s ease, color 0.24s ease;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    .bento-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-hairline);
+      box-shadow: var(--shadow-bento);
+      transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.16s ease;
+    }
+
+    .bento-card-interactive:hover {
+      background-color: var(--bg-card-hover);
+      border-color: var(--border-strong);
+    }
+
+    .topbar-glass {
+      background-color: var(--bg-topbar);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-hairline);
+    }
+
+    .ai-obsidian {
+      background-color: var(--ai-bg);
+      border: 1px solid var(--ai-border);
+      color: var(--ai-text-primary);
+    }
+
+    .ai-subcard {
+      background-color: var(--ai-subcard);
+      border: 1px solid var(--ai-border);
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* =====================================================================
+       SIGNATURE MTS MOTIF: "ЖИВОЙ УГОЛОК" (LIVING CORNER)
+       ===================================================================== */
+    .live-corner-host {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .live-corner {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 24px;
+      height: 24px;
+      pointer-events: none;
+      clip-path: polygon(0 0, 100% 0, 100% 100%);
+      transition: background-color 0.25s ease, opacity 0.25s ease;
+    }
+
+    .live-corner-sm {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 18px;
+      height: 18px;
+      pointer-events: none;
+      clip-path: polygon(0 0, 100% 0, 100% 100%);
+    }
+
+    .live-corner-lg {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 32px;
+      height: 32px;
+      pointer-events: none;
+      clip-path: polygon(0 0, 100% 0, 100% 100%);
+    }
+
+    .corner-red { background-color: #FF0032; }
+    .corner-blue { background-color: #2563EB; }
+    .corner-emerald { background-color: #10B981; }
+    .corner-amber { background-color: #F59E0B; }
+
+    @keyframes pulseSurgical {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.36; }
+    }
+
+    .pulse-surgical {
+      animation: pulseSurgical 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    .row-selected {
+      box-shadow: var(--shadow-selected) !important;
+      border-color: transparent !important;
+    }
+
+    .row-selected-p1 {
+      box-shadow: var(--shadow-selected-p1) !important;
+      border-color: transparent !important;
+    }
+
+    @keyframes flashRed {
+      0% { transform: translateY(-4px); box-shadow: 0 0 0 2px #FF0032, 0 12px 28px rgba(255, 0, 50, 0.25); }
+      100% { transform: translateY(0); }
+    }
+    @keyframes flashBlue {
+      0% { transform: translateY(-4px); box-shadow: 0 0 0 2px #2563EB, 0 12px 28px rgba(37, 99, 235, 0.22); }
+      100% { transform: translateY(0); }
+    }
+    @keyframes flashEmerald {
+      0% { box-shadow: 0 0 0 2px #10B981, 0 12px 26px rgba(16, 185, 129, 0.22); }
+      100% { box-shadow: var(--shadow-bento); }
+    }
+
+    .anim-flash-red { animation: flashRed 1.3s ease-out; }
+    .anim-flash-blue { animation: flashBlue 1.3s ease-out; }
+    .anim-flash-emerald { animation: flashEmerald 1.3s ease-out; }
+
+    /* Dynamic Island Floating Alert */
+    .dynamic-island {
+      transform: translate(-50%, -155%);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.26s ease;
+    }
+    .dynamic-island.visible {
+      transform: translate(-50%, 0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* SVG Chart Tooltip */
+    .chart-tooltip {
+      background-color: var(--tooltip-bg);
+      color: var(--tooltip-text);
+      border: 1px solid var(--tooltip-border);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+      pointer-events: none;
+      transition: opacity 0.14s ease, transform 0.1s ease;
+    }
+
+    /* Donut Segment Transition */
+    .donut-segment {
+      transition: stroke-width 0.18s ease, opacity 0.18s ease, stroke-dasharray 0.45s cubic-bezier(0.22, 1, 0.36, 1), stroke-dashoffset 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+      cursor: pointer;
+    }
+
+    /* Wallboard Panoramic Ticker */
+    @keyframes wallboardMarquee {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .marquee-track {
+      display: flex;
+      width: max-content;
+      animation: wallboardMarquee 36s linear infinite;
+    }
+    .marquee-track.paused {
+      animation-play-state: paused;
+    }
+    .marquee-container:hover .marquee-track {
+      animation-play-state: paused;
+    }
+
+    /* Clean thin scrollbars */
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.32); border-radius: 999px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.56); }
+  

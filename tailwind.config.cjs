@@ -1,0 +1,1 @@
+module.exports={content:['./web/index.html','./web/reference-view.js','./web/analytics-ui.js'],theme:{extend:{fontFamily:{sans:['Inter','system-ui','sans-serif'],mono:['JetBrains Mono','ui-monospace','monospace']},colors:{mtsRed:'#FF0032',mtsBlue:'#2563EB',mtsEmerald:'#10B981',mtsAmber:'#F59E0B',mtsViolet:'#8B5CF6'}}},plugins:[]};

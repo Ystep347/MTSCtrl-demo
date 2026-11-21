@@ -1,0 +1,25 @@
+/* Existing functional dialogs, preserved during the reference layout transfer. */
+/* The sticky header must rise above the utility row while the account menu is open. */
+.topbar-glass:has(.account-menu:not([hidden])) { z-index: 50; }
+@media (max-width: 767px) {
+  .topbar-glass .account-area { position: static; }
+  .topbar-glass .account-menu {
+    top: calc(100% + 4px);
+    right: 16px;
+    width: min(286px, calc(100% - 32px));
+  }
+}
+.drawer,.about-dialog,.import-dialog,.assistant-panel{background:var(--surface);color:var(--ink);border-color:var(--border)}
+.drawer-header,.drawer-footer,.drawer-tabs,.drawer-tabs button{border-color:var(--border)}.drawer-header{background:var(--surface)}.drawer-tabs button{color:var(--muted)}.drawer-tabs button.active{color:var(--red);border-color:var(--red)}.drawer-body{background:var(--surface)}.drawer-id,.detail-label{color:var(--muted)}.detail-value{color:var(--ink)}.detail-description p,.ai-disclaimer,.drawer-footer p,.history-status{color:var(--muted)}
+.deadline-box{background:var(--red-soft);border-color:#ff003228}.deadline-box.resolved,.deadline-box.research{background:#10b9810a;border-color:#10b98125}.deadline-big{font-family:ui-monospace,monospace}.deadline-caption,.deadline-box p{color:var(--muted)}.inline-ai,.about-note,.history-diff,.import-summary{background:var(--soft);border-color:var(--border);color:var(--ink)}.inline-ai p,.about-dialog>p,.about-note p{color:var(--muted)}
+.assistant-header{background:var(--surface);border-color:var(--border)}.assistant-heading p,.assistant-context,.assistant-footer-note{color:var(--muted)}.assistant-message{border-color:var(--border);background:var(--soft);color:var(--ink)}.assistant-message.user{background:var(--red-soft);border-color:#ff003222}.assistant-message-label,.assistant-message time{color:var(--muted)}.assistant-form{background:var(--surface);border-color:var(--border)}.assistant-form textarea{background:var(--soft);border-color:var(--border);color:var(--ink)}.assistant-presets button{background:var(--soft);border-color:var(--border);color:var(--ink)}.assistant-form-bottom,.assistant-keyboard-hint{color:var(--muted)}.assistant-new-chat,.assistant-setup-link{color:var(--blue)}.assistant-auth-gate{background:var(--soft);border-color:var(--border)}.assistant-auth-gate p{color:var(--muted)}
+.assistant-message-body,.assistant-message.user .assistant-message-body,.assistant-auth-gate strong{color:var(--ink)}
+.timeline-item{border-color:var(--border)}.timeline-item:before{background:var(--strong-border);border-color:var(--surface);outline-color:var(--border)}.timeline-item strong,.team-stats strong{color:var(--ink)}.timeline-item p,.timeline-item time,.risk-factors,.source-note,.ai-section-label{color:var(--muted)}.recommendation{border-color:var(--border);background:var(--soft)}.recommendation strong{color:var(--ink)}.recommendation p{color:var(--muted)}
+.import-intro,.import-limit,.import-summary>p,.import-preview-note{color:var(--muted)}.import-dialog input[type="file"]{background:var(--soft);border-color:var(--strong-border);color:var(--ink)}.import-dialog input::file-selector-button{background:var(--surface);border-color:var(--border);color:var(--ink)}.import-heading,.import-footer,.import-change-list li,.import-summary .import-preview-note{border-color:var(--border)}
+.toast{background:#11131a;border-color:#343c50;color:#f8fafc}.toast p{color:#b7c3d6}.toast-close{color:#b7c3d6}
+[data-theme="night"] .group-badge{background:#24314a;color:#b6c9ed}[data-theme="night"] .group-badge.research{background:#12382b;color:#71d9b0}[data-theme="night"] .group-badge.critical{background:#401a29;color:#ff8ca4}
+[data-theme="night"] .account-trigger .profile{background:var(--soft);color:var(--ink);border-color:var(--border)}
+[data-theme="night"] .group-critical .group-count{background:#401a29;color:#ff8ca4}
+[data-theme="night"] .assistant-mode,[data-theme="night"] .assistant-mode-note,[data-theme="night"] .assistant-warning{background:#33291b;color:#f7c57d;border-color:#655032}[data-theme="night"] .assistant-mode.connected,[data-theme="night"] .assistant-mode-note.connected{background:#153628;color:#79deb3;border-color:#266048}
+
+.assistant-data-proof{font-size:12px;line-height:1.5;padding:7px 9px;margin-top:10px;border:1px solid var(--border-hairline,#e4e6ed);border-radius:8px;color:var(--text-secondary,#687384);background:var(--bg-muted-soft,#f5f6f9)}

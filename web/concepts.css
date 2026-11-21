@@ -1,0 +1,265 @@
+/* All selectors apply only to the four review pages, never to /. */
+html[data-design]{--red:#ff0032;--red-dark:#d9002b;--ink:#1d2023;--muted:#626c77;--border:#e2e5eb;--bg:#f2f3f7;--soft:#f7f8fa;--rail:100px;font-family:"MTS Compact","Segoe UI",Arial,sans-serif;color-scheme:light;background:var(--bg)}
+html[data-design] body{color:var(--ink)}
+html[data-design] .concept-ribbon{position:relative;z-index:48;height:44px;min-height:44px;display:flex;align-items:center;gap:14px;padding:7px 25px;background:#1d2023;color:#fff;font-size:14px;line-height:1.4}
+html[data-design] .concept-ribbon a{color:#fff;text-decoration:none;border-bottom:1px solid #7e8792;white-space:nowrap}
+html[data-design] .concept-ribbon strong{font-weight:600;margin-right:auto}
+html[data-design] .concept-ribbon button{font:inherit;background:#373d46;border-radius:7px;color:#fff;padding:5px 10px}
+html[data-design] .concept-ribbon button[aria-pressed=true]{background:#fff;color:#1d2023}
+html[data-design] .rail{top:44px;background:#fff;color:#626c77;border-right:1px solid var(--border)}
+html[data-design] .brand{background:none;padding:0;width:44px;height:44px;border-radius:0;margin:24px 0 28px;overflow:hidden}
+html[data-design] .brand img{display:block;width:100%;height:100%;object-fit:contain}
+html[data-design] .rail-divider{background:var(--border)}
+html[data-design] .rail-nav{gap:9px;padding:0 12px}
+html[data-design] .nav-item{border-radius:13px;color:inherit;padding:16px 2px;gap:9px}
+html[data-design] .nav-item:hover{background:#f2f3f7;color:var(--ink)}
+html[data-design] .nav-item.active{background:#ff0032;color:white}
+html[data-design] .nav-item.active:before{display:none}
+html[data-design] .rail-label{color:#626c77}
+html[data-design] .topbar{height:64px;background:#fff;border-color:var(--border);padding:0 30px}
+html[data-design] .product-name strong,html[data-design] h1,html[data-design] .metric-value strong{font-family:"MTS Wide","Segoe UI",Arial,sans-serif}
+html[data-design] .product-name strong{font-size:25px;font-weight:800}
+html[data-design] main{padding:23px 30px 18px;max-width:1760px}
+html[data-design] h1{font-size:34px;letter-spacing:-1.25px;font-weight:750;line-height:1.2}
+html[data-design] .eyebrow{color:#626c77;font-size:12px;font-weight:650;letter-spacing:1.4px;margin-bottom:10px}
+html[data-design] .page-heading p{display:none;font-size:16px;color:var(--muted)}
+html[data-design] .page-heading{margin-bottom:20px}
+html[data-design] .button{border-radius:12px;min-height:44px;font-size:14px;padding:12px 16px;box-shadow:none}
+html[data-design] .button-primary{background:var(--red);border-color:var(--red)}
+html[data-design] .button-primary:hover{background:var(--red-dark)}
+html[data-design] .data-status{border:0;border-radius:14px;background:#fff;padding:12px 16px;margin-bottom:16px}
+html[data-design] .data-status-copy strong{font-size:15px;color:var(--ink)}
+html[data-design] .data-status-copy p{font-size:14px;line-height:1.4;color:var(--muted)}
+html[data-design] .data-status.data-demo{background:#fff7e7;border:1px solid #f1dfb2}
+html[data-design] .data-status.data-demo .data-status-copy p{display:none}
+html[data-design] .data-status .data-actions .button{min-height:37px;padding:9px 12px}
+html[data-design] .data-status .data-source-icon{width:32px;height:32px;border-radius:9px}
+html[data-design] .data-quality summary{font-size:14px}
+html[data-design] .critical-banner{border-radius:14px;background:#fff0f3;border:1px solid #ffc5d0;margin-bottom:15px;padding:13px 17px}
+html[data-design] .critical-banner strong{font-size:17px;line-height:1.45}
+html[data-design] .critical-banner p{font-size:14px;color:#985061}
+html[data-design] .critical-banner.success{background:#eff8f2;border-color:#cce4d4}
+html[data-design] .critical-banner.success p{color:#4b705a}
+html[data-design] .banner-icon{width:44px;height:44px;border-radius:12px;color:var(--red);background:#ffdde4}
+html[data-design] .success .banner-icon{color:#18805a;background:#e0f1e6}
+html[data-design] .metric{border:0;border-radius:15px;padding:15px 18px 13px}
+html[data-design] .metric-top{font-size:14px;color:var(--muted)}
+html[data-design] .metric-value strong{font-size:33px;font-weight:750}
+html[data-design] .metric-note{font-size:12px;color:var(--muted)}
+html[data-design] .metric.critical{background:#fff;color:var(--red)}
+html[data-design] .metric.selected{box-shadow:inset 0 0 0 2px var(--red);background:#fff3f6}
+html[data-design] .metrics{gap:14px;margin-bottom:22px}
+html[data-design] .toolbar{gap:10px;margin-bottom:22px}
+html[data-design] .search-field,html[data-design] .select-field select,html[data-design] .filter-chip,html[data-design] .view-switch{border-color:#dfe3e9;border-radius:12px}
+html[data-design] .search-field input{font-size:15px;height:45px}
+html[data-design] .filter-chip,html[data-design] .select-field select{font-size:14px;min-height:45px}
+html[data-design] .board-heading h2{font-size:18px;letter-spacing:-.3px}
+html[data-design] .board-heading p{font-size:13px;color:var(--muted)}
+html[data-design] .board{gap:16px}
+html[data-design] .incident-group{border:0;border-radius:18px;box-shadow:none;overflow:hidden;background:#fff}
+html[data-design] .group-head{padding:17px 15px 15px;border-bottom:1px solid var(--border);gap:4px}
+html[data-design] .group-title-row h3{font-size:15px;line-height:1.35;white-space:normal}
+html[data-design] .group-count{font-size:13px;padding:3px 7px;border-radius:6px}
+html[data-design] .group-critical .group-head{box-shadow:inset 0 3px var(--red)}
+html[data-design] .group-coord .group-head{box-shadow:inset 0 3px #e2b15b}
+html[data-design] .group-high .group-head{box-shadow:inset 0 3px #f18c51}
+html[data-design] .group-research .group-head{box-shadow:inset 0 3px #8798d4}
+html[data-design] .group-cards{padding:0 15px}
+html[data-design] .incident-card{padding:17px 0;border-color:var(--border)}
+html[data-design] .incident-card:hover{background:#f7f8fa}
+html[data-design] .card-title{font-size:16px;line-height:1.45;font-weight:650;letter-spacing:-.15px;-webkit-line-clamp:3}
+html[data-design] .incident-id{font-size:12px;color:#626c77;letter-spacing:0}
+html[data-design] .status{font-size:12px;line-height:1.4;border-radius:6px;padding:3px 6px}
+html[data-design] .status.investigating{color:#66509b;background:#eee8f7}
+html[data-design] .card-middle{gap:10px;margin-bottom:9px;flex-wrap:wrap}
+html[data-design] .card-product{font-size:13px;color:#626c77;max-width:100%}
+html[data-design] .deadline{font-size:14px;font-weight:650}
+html[data-design] .card-assignment{font-size:14px;line-height:1.5;color:#555e6a;margin-bottom:9px}
+html[data-design] .card-team{font-size:13px;color:#626c77}
+html[data-design] .card-bottom>span:last-child{font-size:12px;color:#626c77}
+html[data-design] .group-foot{font-size:12px;line-height:1.6;padding:13px 15px;color:#626c77;background:#fafbfc;min-height:60px}
+html[data-design] .board-note{font-size:13px;line-height:1.5;color:#626c77;margin-top:17px}
+html[data-design] .activity-panel,html[data-design] .ai-teaser,html[data-design] .team-panel,html[data-design] .table-panel{border:0;border-radius:18px;box-shadow:none}
+html[data-design] .activity-head h2{font-size:17px}
+html[data-design] .event-copy strong{font-size:14px;line-height:1.5}
+html[data-design] .event-copy p{font-size:13px;line-height:1.5;color:var(--muted)}
+html[data-design] .event-copy time{font-size:12px;color:var(--muted)}
+html[data-design] .ai-teaser{background:#eeeafa;border:1px solid #e3dcf5;padding:21px}
+html[data-design] .ai-teaser p{font-size:15px;line-height:1.6;color:#615475}
+html[data-design] .ai-heading{font-size:17px;color:#514568}
+html[data-design] .assistant-launcher{background:var(--red);border-radius:14px;box-shadow:0 7px 22px #ff003225}
+html[data-design] .just-arrived{animation:concept-arrival .5s ease-out}
+html[data-design] .incidents-table td{padding-top:17px;padding-bottom:17px;font-size:14px}
+html[data-design] .incidents-table th{font-size:14px;color:var(--muted)}
+html[data-design] .table-incident strong{font-size:15px;line-height:1.45}
+html[data-design] .profile{border:0;outline:none}
+html[data-design][data-quiet=true] .dashboard-aside,html[data-design][data-quiet=true] .page-heading p,html[data-design][data-quiet=true] .board-note,html[data-design][data-quiet=true] .page-footer{display:none}
+html[data-design][data-quiet=true] .dashboard-layout{grid-template-columns:minmax(0,1fr)}
+html[data-design][data-thumbnail=true] .concept-ribbon{display:none}
+html[data-design][data-thumbnail=true] .rail{top:0}
+html[data-design][data-thumbnail=true] .assistant-launcher{display:none}
+@keyframes concept-arrival{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
+/* A: recognisable, airy MTS product workspace. */
+html[data-design=classic] .topbar{border:0}
+html[data-design=classic] .metrics .metric:first-child{background:#1d2023;color:#fff}
+html[data-design=classic] .metrics .metric:first-child .metric-top,html[data-design=classic] .metrics .metric:first-child .metric-note{color:#d2d6dd}
+html[data-design=classic] .rail{border:0}
+
+/* B: a quiet night shift, with meaningful state colours. */
+html[data-design=night]{--ink:#f3f5f8;--muted:#b1bac7;--border:#363e49;--bg:#14171b;--soft:#242a33;color-scheme:dark}
+html[data-design=night] .rail{background:#101216;color:#aeb9c7;border-color:#303744}
+html[data-design=night] .topbar{background:#1a1e24;border-color:#303744}
+html[data-design=night] .product-subtitle,html[data-design=night] .eyebrow,html[data-design=night] .account-trigger,html[data-design=night] .topbar time,html[data-design=night] .rail-label{color:#b1bac7}
+html[data-design=night] .nav-item.active{background:#ff0032}
+html[data-design=night] .nav-item:hover{background:#2c333e;color:#fff}
+html[data-design=night] .data-status,html[data-design=night] .metric,html[data-design=night] .incident-group,html[data-design=night] .activity-panel,html[data-design=night] .table-panel,html[data-design=night] .team-panel{background:#20252d;border:1px solid #303844}
+html[data-design=night] .data-status.data-demo{background:#302b20;border-color:#5c5138}
+html[data-design=night] .data-quality summary,html[data-design=night] .data-quality p,html[data-design=night] .data-quality li{color:#c2cbd6}
+html[data-design=night] .data-demo .data-source-icon{background:#4e4127;color:#ffd783}
+html[data-design=night] .critical-banner{background:#321d27;border-color:#6d2d42}
+html[data-design=night] .critical-banner p{color:#edb9c6}
+html[data-design=night] .critical-banner .banner-icon{background:#572336;color:#ff7c96}
+html[data-design=night] .critical-banner strong,html[data-design=night] .banner-button{color:#fff0f4}
+html[data-design=night] .critical-banner.success{background:#1b3028;border-color:#315a48}
+html[data-design=night] .critical-banner.success p{color:#b4d6c5}
+html[data-design=night] .metric.critical .metric-value strong,html[data-design=night] .metric.critical .metric-top svg{color:#ff8299}
+html[data-design=night] .metric.critical{background:#20252d;color:#ff8299}
+html[data-design=night] .new-tag{color:#ff91a6}
+html[data-design=night] .metric.overdue .metric-value strong{color:#ffd080}
+html[data-design=night] .metric.selected{background:#37242e;border-color:#b74461}
+html[data-design=night] .button-secondary,html[data-design=night] .search-field,html[data-design=night] .select-field select,html[data-design=night] .filter-chip,html[data-design=night] .view-switch{background:#252b34;border-color:#414b58;color:#e6ebf2}
+html[data-design=night] .button-secondary:hover,html[data-design=night] .view-switch button.active{background:#39424f;color:#fff}
+html[data-design=night] .filter-chip[aria-pressed=true]{background:#4e2635;color:#ffbfd0;border-color:#8e3c54}
+html[data-design=night] .group-head,html[data-design=night] .incident-card,html[data-design=night] .incidents-table td,html[data-design=night] .event-item{border-color:#363e49}
+html[data-design=night] .group-foot,html[data-design=night] .incidents-table th,html[data-design=night] .table-meta{background:#1b2027;color:#b1bac7}
+html[data-design=night] .incident-card:hover,html[data-design=night] .incidents-table tbody tr:hover{background:#2a313c}
+html[data-design=night] .group-count{background:#333d4a;color:#dce3ef}
+html[data-design=night] .card-product,html[data-design=night] .card-team,html[data-design=night] .card-assignment,html[data-design=night] .incident-id,html[data-design=night] .card-bottom>span:last-child,html[data-design=night] .board-note{color:#b9c3d1}
+html[data-design=night] .deadline.breached,html[data-design=night] .deadline.urgent{color:#ff91a6}
+html[data-design=night] .deadline.recovered{color:#8cdbb7}
+html[data-design=night] .ai-teaser{background:#2b263d;border-color:#44395f}
+html[data-design=night] .ai-heading,html[data-design=night] .ai-teaser p,html[data-design=night] .ai-teaser button{color:#ded0ff}
+html[data-design=night] .drawer,html[data-design=night] .drawer-header,html[data-design=night] .drawer-footer,html[data-design=night] .notification-popover,html[data-design=night] .scenario-menu,html[data-design=night] .account-menu,html[data-design=night] .assistant-panel,html[data-design=night] .assistant-header,html[data-design=night] .about-dialog,html[data-design=night] .import-dialog{background:#20252d;color:#f3f5f8;border-color:#414b58}
+html[data-design=night] .drawer-header h2,html[data-design=night] .detail-value,html[data-design=night] .detail-description,html[data-design=night] .drawer-tabs button,html[data-design=night] .detail-label{color:inherit}
+html[data-design=night] .deadline-box,html[data-design=night] .inline-ai,html[data-design=night] .recommendation,html[data-design=night] .history-diff{background:#2b313e;color:#e5eaf5;border-color:#434f64}
+html[data-design=night] .detail-description p,html[data-design=night] .inline-ai p,html[data-design=night] .source-note,html[data-design=night] .timeline-item p,html[data-design=night] .drawer-footer p{color:#bdc7d5}
+html[data-design=night] .assistant-message.assistant,html[data-design=night] .assistant-message,html[data-design=night] .assistant-context,html[data-design=night] .assistant-mode-note,html[data-design=night] .assistant-auth-gate{background:#2a303c;color:#e3e8f2;border-color:#414b58}
+html[data-design=night] .assistant-auth-gate p,html[data-design=night] .assistant-mode-note,html[data-design=night] .assistant-message-body{color:#d5deec}
+html[data-design=night] .assistant-form textarea{background:#171c23;color:#f4f5f8;border-color:#414b58}
+
+/* C: a denser operational ledger, ready for hundreds of rows. */
+html[data-design=focus]{--rail:210px;background:#f5f6f8}
+html[data-design=focus] .rail{align-items:stretch;background:#1d2023;color:#c4cbd5}
+html[data-design=focus] .brand{margin:25px 24px 30px}
+html[data-design=focus] .rail-divider{margin:0 24px 24px;width:auto;background:#41464d}
+html[data-design=focus] .nav-item{flex-direction:row;justify-content:start;padding:15px 17px;gap:13px;font-size:15px;border-radius:10px}
+html[data-design=focus] .nav-item:hover{background:#343b44;color:#fff}
+html[data-design=focus] .rail-bottom{align-items:stretch;padding:0 12px 24px}
+html[data-design=focus] .rail-label{padding:0 17px;color:#9da7b5}
+html[data-design=focus] .topbar{height:70px;background:#f5f6f8;border-bottom:1px solid #e2e5eb}
+html[data-design=focus] .product-name strong{font-size:22px}
+html[data-design=focus] h1{font-size:30px}
+html[data-design=focus] .data-status{padding:12px 16px;border-radius:12px}
+html[data-design=focus] .page-heading{margin-bottom:20px}
+html[data-design=focus] .metric{padding:14px 18px;border-radius:12px;border-left:3px solid #d9dfe8}
+html[data-design=focus] .metric.critical{border-left-color:var(--red)}
+html[data-design=focus] .metric-value{margin-top:5px}
+html[data-design=focus] .metric-value strong{font-size:29px}
+html[data-design=focus] .metrics{gap:10px;margin-bottom:18px}
+html[data-design=focus] .critical-banner{border-radius:12px;padding:14px 17px;margin-bottom:14px}
+html[data-design=focus] .table-panel{border:1px solid #dfe3e9;border-radius:14px}
+html[data-design=focus] .incidents-table td{padding-top:15px;padding-bottom:15px}
+html[data-design=focus] .incidents-table th{padding-top:16px;padding-bottom:16px;background:#fafbfc}
+html[data-design=focus] .incidents-table tbody tr:has(.priority-badge.critical){background:#fff0f3}
+
+/* D: expressive modular composition, in the ecosystem's visual language. */
+html[data-design=digital]{--rail:0px;background:#f2f3f7}
+html[data-design=digital] .rail{position:absolute;top:44px;height:72px;inset-inline:0;width:100%;display:flex;flex-direction:row;align-items:center;gap:25px;padding:0 30px;background:#ff0032;color:#fff;border:0}
+html[data-design=digital] .brand{margin:0;width:42px;height:42px;flex-shrink:0}
+html[data-design=digital] .rail-divider{display:none}
+html[data-design=digital] .rail-nav{flex-direction:row;gap:8px;width:auto;margin-left:15px;padding:0}
+html[data-design=digital] .nav-item{flex-direction:row;gap:9px;width:auto;padding:12px 16px;font-size:15px;color:#fff}
+html[data-design=digital] .nav-item.active{background:#fff;color:#c80028}
+html[data-design=digital] .nav-item:hover{background:#ffffff29;color:white}
+html[data-design=digital] .rail-bottom{margin:0 0 0 auto;width:auto;padding:0;display:block}
+html[data-design=digital] .rail-bottom .nav-item{color:#fff}
+html[data-design=digital] .rail-label{display:none}
+html[data-design=digital] .workspace{margin:0;padding-top:72px}
+html[data-design=digital] .topbar{background:#fff;border:0;height:65px}
+html[data-design=digital] .page-heading{position:relative;margin-bottom:25px;min-height:96px}
+html[data-design=digital] h1{font-size:40px;font-weight:800;max-width:650px;letter-spacing:-1.7px}
+html[data-design=digital] .page-heading .eyebrow{color:#e3002d;letter-spacing:1.6px}
+html[data-design=digital] .metrics{gap:14px}
+html[data-design=digital] .metric{border-radius:20px}
+html[data-design=digital] .metric:first-child{background:#1d2023;color:#fff}
+html[data-design=digital] .metric:first-child .metric-top,html[data-design=digital] .metric:first-child .metric-note{color:#d5dce6}
+html[data-design=digital] .metric.coord{background:#e2eaff}
+html[data-design=digital] .incident-group{border-radius:22px}
+html[data-design=digital] .group-head{padding:20px}
+html[data-design=digital] .group-cards{padding:0 20px}
+html[data-design=digital] .group-title-row h3{font-size:17px}
+html[data-design=digital] .ai-teaser{background:#dedafc;border-radius:22px}
+html[data-design=digital][data-thumbnail=true] .rail{top:0}
+@media(min-width:1200px){
+  html[data-design=digital] .dashboard-layout{grid-template-columns:minmax(0,1fr) 300px;gap:22px}
+  html[data-design=digital] .board{grid-template-columns:repeat(2,minmax(0,1fr))}
+  html[data-design=digital] .dashboard-aside{display:block;position:sticky;top:20px}
+  html[data-design=digital] .activity-list{display:block}
+  html[data-design=digital] .ai-teaser{margin-top:20px}
+}
+@media(max-width:1100px){html[data-design=focus]{--rail:90px}html[data-design=focus] .nav-item{flex-direction:column;padding:15px 2px;font-size:14px;gap:8px}html[data-design=focus] .brand{margin:22px auto}html[data-design=focus] .rail-divider{margin-left:15px;margin-right:15px}}
+@media(max-width:760px){
+  html[data-design]{--rail:0px}
+  html[data-design] .concept-ribbon{height:auto;padding:9px 15px;gap:10px;font-size:12px;min-height:43px;flex-wrap:wrap}
+  html[data-design] .concept-ribbon button{font-size:12px;padding:5px 8px}
+  html[data-design] .concept-ribbon #concept-guide{display:none}
+  html[data-design] .concept-ribbon strong{font-size:12px}
+  html[data-design] .rail{top:auto;bottom:0;height:65px;background:#fff;border-top:1px solid var(--border);border-right:0}
+  html[data-design] .rail-nav{width:100%;max-width:430px;justify-content:space-around;gap:4px;padding:5px 14px}
+  html[data-design] .nav-item{padding:8px 18px;font-size:12px;gap:4px;border-radius:10px;width:auto}
+  html[data-design] .topbar{padding:0 16px;height:63px}
+  html[data-design] main{padding:23px 16px 100px}
+  html[data-design] h1{font-size:28px;letter-spacing:-1px}
+  html[data-design] .page-heading{display:block;margin-bottom:20px;min-height:0}
+  html[data-design] .heading-actions{margin-top:16px;justify-content:start;gap:9px}
+  html[data-design] .page-heading .eyebrow{display:block;font-size:11px}
+  html[data-design] .button{min-height:43px;padding:11px 14px}
+  html[data-design] .data-status{padding:13px;border-radius:13px}
+  html[data-design] .data-status-copy strong{font-size:14px}
+  html[data-design] .data-status-copy p{font-size:13px}
+  html[data-design] .critical-banner{padding:14px 13px;gap:10px;border-radius:13px;align-items:start}
+  html[data-design] .critical-banner strong{font-size:15px;line-height:1.5}
+  html[data-design] .critical-banner p{font-size:13px}
+  html[data-design] .banner-icon{width:33px;height:33px;border-radius:9px}
+  html[data-design] .banner-button{font-size:13px}
+  html[data-design] .metrics{gap:9px;grid-template-columns:repeat(2,minmax(0,1fr))}
+  html[data-design] .metric{padding:14px;border-radius:13px}
+  html[data-design] .metric-top{font-size:14px}
+  html[data-design] .metric-value strong{font-size:29px}
+  html[data-design] .board{grid-template-columns:1fr;gap:15px}
+  html[data-design] .board-heading h2{font-size:17px}
+  html[data-design] .incident-id{font-size:12px}
+  html[data-design] .card-title{font-size:16px}
+  html[data-design] .dashboard-aside{display:block}
+  html[data-design] .ai-teaser{margin-top:18px}
+  html[data-design] .assistant-launcher{bottom:79px;right:16px}
+  html[data-design][data-thumbnail=true] .rail{top:auto}
+  html[data-design=night] .rail{background:#101216;border-color:#363e49}
+  html[data-design=focus]{--rail:0px}
+  html[data-design=focus] .rail{background:#1d2023}
+  html[data-design=focus] .rail-bottom{display:none}
+  html[data-design=focus] .rail-divider{display:none}
+  html[data-design=focus] .brand{display:none}
+  html[data-design=focus] .nav-item{padding:8px 18px;font-size:12px;gap:4px}
+  html[data-design=digital] .rail{position:relative;top:auto;bottom:auto;height:60px;padding:0 16px;gap:0}
+  html[data-design=digital] .brand{display:block;width:34px;height:34px}
+  html[data-design=digital] .rail-nav{margin-left:auto;width:auto;gap:4px;padding:0}
+  html[data-design=digital] .nav-item{font-size:12px;padding:9px 10px;gap:0}
+  html[data-design=digital] .nav-item svg{display:none}
+  html[data-design=digital] .rail-bottom{display:none}
+  html[data-design=digital] .workspace{padding-top:0}
+  html[data-design=digital] h1{font-size:30px}
+  html[data-design=digital][data-thumbnail=true] .rail{top:auto}
+}
+@media(prefers-reduced-motion:reduce){html[data-design] *{animation:none!important;transition:none!important}}

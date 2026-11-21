@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru" data-theme="day">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff">
+  <title>Вход · МТС Ctrl</title><meta name="description" content="Вход в центр координации инцидентов МТС Ctrl. Собственный аккаунт команды.">
+  <link rel="icon" type="image/png" href="/assets/mts-logo.png">
+  <link rel="stylesheet" href="/login.css"><link rel="preload" as="image" href="/assets/login-ctrl-hero.png">
+  <script>
+    try {
+      if (localStorage.getItem('mts-ctrl-theme') === 'night') {
+        document.documentElement.dataset.theme = 'night';
+        document.querySelector('meta[name="theme-color"]').content = '#131722';
+      }
+    } catch {}
+  </script>
+  <script type="module" src="/login.js"></script>
+</head>
+<body>
+  <header class="auth-header"><a class="auth-brand" href="/" aria-label="МТС Ctrl — на дашборд"><img class="brand-mark" src="/assets/mts-logo.png" width="42" height="42" alt=""><strong>МТС Ctrl</strong></a><span class="brand-description">Центр координации</span><a class="header-dashboard" href="/">На дашборд</a></header>
+  <main class="auth-layout">
+    <section class="auth-story" aria-labelledby="story-title">
+      <div class="story-copy"><h1 id="story-title">Всё под Ctrl.</h1><p>Инциденты. Команды. Решения.</p></div>
+      <div class="story-art" aria-hidden="true"><img id="ctrl-art" src="/assets/login-ctrl-hero.png" width="1536" height="1024" alt="" fetchpriority="high"></div>
+      <p class="story-caption"><span aria-hidden="true"></span>МТС Ctrl · Инциденты в фокусе</p>
+    </section>
+    <section class="auth-entry" aria-labelledby="entry-title">
+      <div class="auth-card">
+        <p class="entry-eyebrow">РАБОЧЕЕ ПРОСТРАНСТВО</p><h2 id="entry-title">Войти в МТС Ctrl</h2><p id="entry-description" class="entry-description">Войдите в аккаунт вашей команды</p>
+        <div class="login-tabs" aria-label="Вход и регистрация"><button type="button" id="login-tab" aria-pressed="true">Войти</button><button type="button" id="register-tab" aria-pressed="false">Создать аккаунт</button></div>
+        <form id="password-form" class="login-form" novalidate>
+          <div id="display-name-field" class="form-field" hidden><label for="display-name">Ваше имя</label><input id="display-name" name="displayName" autocomplete="name" maxlength="80" minlength="2" placeholder="Как к вам обращаться"></div>
+          <div class="form-field"><label for="username">Логин или почта</label><input id="username" name="username" type="text" autocomplete="username" required maxlength="254" autocapitalize="none" spellcheck="false" placeholder="coordinator или name@example.ru" aria-describedby="username-help"><p id="username-help" class="field-help">Можно использовать почту или короткий логин латиницей.</p></div>
+          <div class="form-field"><label for="password">Пароль</label><div class="password-input"><input id="password" name="password" type="password" autocomplete="current-password" required aria-describedby="password-rules"><button class="password-toggle" type="button" data-password-toggle="password" aria-label="Показать пароль" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m4 4 16 16"/></svg></button></div><p class="field-help" id="password-rules" hidden>Пароль от 10 символов.</p></div>
+          <div id="confirm-password-field" class="form-field" hidden><label for="confirm-password">Повторите пароль</label><div class="password-input"><input id="confirm-password" type="password" autocomplete="new-password"><button class="password-toggle" type="button" data-password-toggle="confirm-password" aria-label="Показать повтор пароля" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m4 4 16 16"/></svg></button></div></div>
+          <p class="login-error" id="login-error" role="alert" tabindex="-1" hidden></p>
+          <button class="auth-button primary" id="login-submit" type="submit">Войти</button>
+        </form>
+        <div class="login-separator"><span>или</span></div><a class="auth-button guest" href="/" target="_top">Продолжить как гость</a>
+        <p class="account-note">Личный аккаунт. Общая картина инцидентов.</p><p class="registration-note" id="registration-note" hidden>Почта используется как логин. Подтверждение письмом пока не предусмотрено. Новый аккаунт получает роль координатора.</p>
+        <div class="entry-footer"><a class="guide-link" href="/guide.html">Как всё работает</a><details class="service-entry"><summary>Служебный вход</summary><a href="{{AUTH_URL}}" target="_top">Вход редактора платформы</a></details></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

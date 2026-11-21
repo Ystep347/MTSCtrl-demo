@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Инцидент · SimpleOne Демо</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: #f2f5f7;
+      color: #182f3b;
+      --muted: #536775;
+      --line: #dbe3e8;
+      --teal: #0d655e;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    a { color: var(--teal); font-weight: 650; text-underline-offset: .22em; }
+    a:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
+    .topbar { background: #163542; color: #fff; }
+    .topbar-inner, main { width: min(100% - 2rem, 70rem); margin-inline: auto; }
+    .topbar-inner { min-height: 4.25rem; display: flex; align-items: center; gap: .75rem; padding-block: .6rem; }
+    .brand { font-size: 1.25rem; font-weight: 750; }
+    .demo { background: #d9f4eb; color: #17534b; border-radius: .4rem; padding: .25rem .55rem; font-size: .875rem; font-weight: 700; }
+    .topbar a { margin-left: auto; color: #f1fafb; text-align: right; font-size: .9375rem; }
+    main { padding-block: 1.5rem 3rem; }
+    .notice { margin: 0 0 1.25rem; border: 1px solid #bcdad4; border-radius: .6rem; background: #eaf6f2; padding: .75rem 1rem; line-height: 1.5; }
+    .notice strong { margin-right: .5rem; }
+    .notice span { color: #365e56; }
+    .record, .panel { background: #fff; border: 1px solid var(--line); border-radius: .8rem; }
+    .record { padding: clamp(1rem, 3vw, 1.65rem); overflow-wrap: anywhere; }
+    .context { margin: 0 0 .55rem; color: var(--muted); font-size: .9rem; font-weight: 650; }
+    .context span + span::before { content: " / "; margin-inline: .2rem; }
+    h1 { margin: .5rem 0 1rem; font-size: clamp(1.45rem, 4vw, 2.15rem); line-height: 1.22; }
+    .properties { display: flex; flex-wrap: wrap; gap: .5rem; margin: 0; }
+    .properties div { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .5rem; background: #eef3f5; border-radius: .4rem; padding: .4rem .65rem; }
+    .properties div[data-state="critical"] { background: #fce8e9; color: #8a1725; }
+    .properties div[data-state="high"] { background: #fff0db; color: #77460c; }
+    .properties div:is([data-state="resolved"], [data-state="closed"], [data-state="investigating"]) { background: #dff4ed; color: #17534b; }
+    .properties dd { font-weight: 700; }
+    .properties dt { color: inherit; }
+    .columns { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); align-items: start; gap: 1rem; margin-top: 1rem; }
+    .panel { padding: 1.2rem; overflow-wrap: anywhere; }
+    .panel h2 { margin: 0 0 1rem; font-size: 1.125rem; }
+    .panel h3 { margin: 1.25rem 0 .35rem; font-size: 1rem; }
+    .details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 0; }
+    .assignment { display: grid; gap: 1rem; margin: 0; }
+    dt { color: var(--muted); font-size: .875rem; }
+    dd { margin: .2rem 0 0; line-height: 1.5; }
+    .properties dd { margin: 0; }
+    .text { margin: 0; line-height: 1.6; white-space: pre-wrap; }
+    .source { margin: .75rem 0 0; font-size: .875rem; color: var(--muted); }
+    #error { margin: .6rem 0 0; color: #8a1725; }
+    #loading { color: var(--muted); }
+    [hidden] { display: none !important; }
+    @media (max-width: 42rem) { .columns { grid-template-columns: 1fr; } }
+    @media (max-width: 26rem) { .details { grid-template-columns: 1fr; } .topbar-inner { flex-wrap: wrap; } }
+  </style>
+  <script type="module" src="/itsm-demo.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <span class="brand">SimpleOne</span>
+      <span class="demo">Демо</span>
+      <a id="dashboard-link" href="/">Вернуться в МТС Фокус</a>
+    </div>
+  </header>
+  <main>
+    <aside class="notice">
+      <strong>Учебный стенд ITSM</strong>
+      <span>Карточка доступна для просмотра. Данные поступают из «МТС Фокус».</span>
+    </aside>
+    <section class="record" aria-labelledby="incident-title" aria-busy="true" id="record">
+      <p class="context"><span>Инциденты</span><span id="incident-id" hidden></span></p>
+      <h1 id="incident-title">Карточка инцидента</h1>
+      <p id="loading" role="status">Загружаем инцидент…</p>
+      <p id="error" role="alert" hidden></p>
+      <dl class="properties" id="properties" hidden>
+        <div id="status-badge"><dt>Статус</dt><dd id="incident-status"></dd></div>
+        <div id="priority-badge"><dt>Приоритет</dt><dd id="incident-priority"></dd></div>
+      </dl>
+      <p class="source" id="incident-source" hidden></p>
+    </section>
+    <div class="columns" id="incident-body" hidden>
+      <section class="panel" aria-labelledby="details-title">
+        <h2 id="details-title">Детали инцидента</h2>
+        <dl class="details">
+          <div><dt>Продукт</dt><dd id="incident-product"></dd></div>
+          <div><dt>Сервис</dt><dd id="incident-service"></dd></div>
+          <div><dt>Время возникновения</dt><dd id="incident-created"></dd></div>
+          <div><dt>Срок решения</dt><dd id="incident-deadline"></dd></div>
+          <div id="recovered-field" hidden><dt>Восстановление / завершение</dt><dd id="incident-recovered"></dd></div>
+        </dl>
+        <h3>Описание</h3>
+        <p class="text" id="incident-description"></p>
+        <section id="resolution" hidden>
+          <h3>Решение</h3>
+          <p class="text" id="incident-solution"></p>
+        </section>
+      </section>
+      <section class="panel" aria-labelledby="assignment-title">
+        <h2 id="assignment-title">Назначение</h2>
+        <dl class="assignment">
+          <div><dt>Команда</dt><dd id="incident-team"></dd></div>
+          <div><dt>Исполнитель</dt><dd id="incident-assignee"></dd></div>
+          <div id="sysid-field" hidden><dt>Системный ID</dt><dd id="incident-sysid"></dd></div>
+        </dl>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
