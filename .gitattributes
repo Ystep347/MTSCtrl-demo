@@ -1,2 +1,4 @@
 *.js text eol=lf
 *.mjs text eol=lf
+*.cmd text eol=crlf
+*.zip binary

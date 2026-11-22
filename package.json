@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "node scripts/dev-server.mjs",
     "build": "node scripts/build.mjs",
+    "package:server": "npm run build && npm run validate && node scripts/package-server.mjs",
+    "test:package": "node scripts/verify-server-zip.mjs",
     "test": "node --test tests/*.test.mjs",
     "validate": "node scripts/validate-artifact.mjs",
     "db:generate": "drizzle-kit generate",

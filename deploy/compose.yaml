@@ -1,0 +1,15 @@
+services:
+  focus:
+    image: node:24-alpine
+    working_dir: /app
+    command: ["node", "start.mjs"]
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${PORT:-4173}:${PORT:-4173}"
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "${PORT:-4173}"
+    volumes:
+      - .:/app:ro
+      - ./local-data:/app/local-data

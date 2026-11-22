@@ -461,7 +461,7 @@ function passLocalIncident(event){
   const item=items.find(row=>row.id===link.dataset.simpleone);
   if(!item)return;
   try{
-    const token=crypto.randomUUID();
+    const token=Array.from(crypto.getRandomValues(new Uint8Array(16)),byte=>byte.toString(16).padStart(2,'0')).join('');
     const key='mts-simpleone-preview:'+token;
     localStorage.setItem(key,JSON.stringify(item));
     // The new tab consumes the handoff. Expire it if the tab was never opened.
